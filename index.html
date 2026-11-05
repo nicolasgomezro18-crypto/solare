@@ -874,8 +874,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <div class="f-col">
       <h4>Ayuda</h4>
       <span>WhatsApp <span class="mono" id="waTxt"></span></span>
-      <a href="#">Términos y condiciones</a>
-      <a href="#">Política de privacidad</a>
+      <a href="terminos.html">Términos y condiciones</a>
+      <a href="privacidad.html">Política de privacidad</a>
     </div>
     <p class="f-legal">© 2026 Solare®. Precios en pesos colombianos, impuestos incluidos.</p>
   </div>
@@ -938,7 +938,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     </div>
   </div>
   <div class="dpay" id="dpay" hidden>
-    <label class="terms" id="termsBox"><input type="checkbox" id="terms"> <span>Acepto los <a href="#">términos y condiciones</a></span></label>
+    <label class="terms" id="termsBox"><input type="checkbox" id="terms"> <span>Acepto los <a href="terminos.html" target="_blank" rel="noopener">términos y condiciones</a></span></label>
     <p class="terms-err" id="termsErr" hidden>Marca la casilla de términos para continuar.</p>
     <div class="dbtns">
       <button class="btn btn-line" type="button" id="seguir">Seguir comprando</button>
@@ -974,7 +974,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <label class="check"><input type="checkbox" id="lOk"> <span>Autorizo a Solare a tratar mis datos y a enviarme novedades y promociones.</span></label>
       <p class="form-err" id="leadErr" role="alert" hidden></p>
       <button class="btn btn-ink" type="submit">Quiero mi descuento</button>
-      <p class="legal">Puedes darte de baja cuando quieras. Consulta cómo usamos tus datos en nuestra <a href="#">política de privacidad</a>.</p>
+      <p class="legal">Puedes darte de baja cuando quieras. Consulta cómo usamos tus datos en nuestra <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</p>
       <button class="linkbtn no-gracias" type="button" id="noGracias">No, gracias</button>
     </form>
     <div class="promo-form" id="leadOk" hidden>
@@ -1646,7 +1646,7 @@ function pintarRx() {
       '<p class="rx-rango">Tallamos a precio único fórmulas de visión sencilla con esfera de ' + fmtD(FORMULA.rango.esfMin) + ' a ' + fmtD(FORMULA.rango.esfMax) + ' y cilindro hasta ' + fmtD(FORMULA.rango.cilMin) + '.</p>';
   } else if (rx.paso === 2) {
     var modos = [['archivo', 'Subir foto o archivo', 'Una foto clara de tu fórmula médica.'], ['manual', 'Ingresarla a mano', 'Esfera, cilindro y eje de cada ojo.'], ['despues', 'Enviarla después por WhatsApp', 'Terminas la compra y nos la mandas por el chat.']];
-    h = '<h2 id="rxTitulo">Agrega tu fórmula</h2><p class="rx-sub">No tallamos nada hasta revisarla.</p>' +
+    h = '<h2 id="rxTitulo">Agrega tu fórmula</h2><p class="rx-sub">No tallamos nada hasta revisarla. Tu fórmula es un dato sensible: solo la usamos para tus lentes (<a href="privacidad.html#sensibles" target="_blank" rel="noopener">ver política</a>).</p>' +
       modos.map(function (m) {
         return '<button class="rx-op" type="button" data-rxmodo="' + m[0] + '" aria-pressed="' + (rx.modo === m[0]) + '">' + ICONO(m[0]) +
           '<span><span class="t">' + m[1] + '</span><span class="d">' + m[2] + '</span></span><span></span></button>' + (rx.modo === m[0] ? panelModo(m[0]) : '');
