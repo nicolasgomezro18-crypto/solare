@@ -372,6 +372,17 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .combo-precio s{color:var(--muted);font-size:.78rem;font-weight:400}
 .buy .btn-rx{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
 .regalo-nota{display:flex;gap:10px;align-items:flex-start;margin:0;font-size:.9rem;line-height:1.4}
+.garantia{border-radius:14px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);font-size:.9rem}
+.garantia summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;list-style:none;line-height:1.35}
+.garantia summary::-webkit-details-marker{display:none}
+.garantia summary::after{content:"+";margin-left:auto;font:500 16px/1 var(--f-mono);color:var(--muted)}
+.garantia[open] summary::after{content:"−"}
+.garantia summary svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--ok);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.g-cuerpo{padding:0 14px 14px 44px;display:grid;gap:6px;color:var(--muted)}
+.g-cuerpo p{margin:0}
+.g-cuerpo ul{margin:0;padding-left:18px;color:var(--ink)}
+.g-cuerpo .g-req{font-size:.84rem}
+.g-cuerpo a{color:var(--ink);font-weight:500}
 .regalo-nota svg,.nota-envio svg.regalo{width:20px;height:20px;flex:none;margin-top:1px;fill:none;stroke:var(--sun-deep);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 /* Sección de fórmula */
@@ -799,7 +810,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <p class="eyebrow rv">Comparar</p>
       <h2 class="h2 rv"><span data-n-nombre="0">Maximus</span> o <span data-n-nombre="1">Speed Advance</span></h2>
       <div class="comp" id="comp"></div>
-      <p class="comp-nota">Las dos pesan <span data-peso="0">25</span> g, tienen filtro UV400 categoría 3, tecnología antiempañante y aceptan fórmula.</p>
+      <p class="comp-nota">Las dos pesan <span data-peso="0">25</span> g, tienen filtro UV400 categoría 3, tecnología antiempañante, aceptan fórmula y tienen 6 meses de garantía.</p>
     </div>
   </section>
 
@@ -1031,6 +1042,13 @@ var FORMULA = {
 };
 var FORMULA_WEBHOOK = '';               // URL de n8n que recibe la foto de la fórmula (vacío = el cliente la adjunta en WhatsApp)
 var REGALO = { nombre: 'Kit de protección', incluye: 'Estuche rígido, funda y paño de microfibra' };
+// Garantía definida por Solare (5 nov 2026). Debe coincidir con la sección 8 de terminos.html.
+var GARANTIA = {
+  meses: 6,
+  cubre: ['Capas despegadas (no quebradas)', 'Partes sueltas', 'Oxidación', 'Lentes sueltos'],
+  compromiso: 'Si es un defecto de fabricación dentro del tiempo de garantía, reparamos o cambiamos tus gafas.',
+  requisito: 'Debes presentar tu certificado de garantía, recibo de compra o confirmación de pago.'
+};
 
 // Fotos: img/<id>-<color>-<vista>.webp. Las vistas "de cerca" se recortan para llenar el cuadro.
 // Referencias reales de Wanderth (confirmadas por Solare, 5 nov 2026). El id se queda igual porque nombra las fotos.
@@ -1044,7 +1062,7 @@ var GAFAS = [
       { id: 'dorado', nombre: 'Blanco y dorado', montura: '#F1F1EE', lente: '#D4AE45' },
       { id: 'humo',   nombre: 'Humo',            montura: '#6A6B6F', lente: '#CDD1D6' }
     ],
-    specs: [['Marca', 'Wanderth'], ['Peso', '25 g'], ['Montura', 'Media montura con ranuras de ventilación'], ['Varillas', 'Fibra de carbono'], ['Lente', 'Espejado, de una sola pieza'], ['Protección', 'Filtro UV400 categoría 3'], ['Tecnología', 'Antiempañante'], ['Fórmula', 'Acepta clip óptico'], ['Colores', 'Azul, blanco y dorado, humo']],
+    specs: [['Marca', 'Wanderth'], ['Peso', '25 g'], ['Montura', 'Media montura con ranuras de ventilación'], ['Varillas', 'Fibra de carbono'], ['Lente', 'Espejado, de una sola pieza'], ['Protección', 'Filtro UV400 categoría 3'], ['Tecnología', 'Antiempañante'], ['Fórmula', 'Acepta clip óptico'], ['Garantía', '6 meses por defectos de fabricación'], ['Colores', 'Azul, blanco y dorado, humo']],
     comparar: { diseno: 'Media montura ventilada', ventilacion: 'Ranuras en montura y lente' }
   },
   {
@@ -1057,7 +1075,7 @@ var GAFAS = [
       { id: 'rojo',    nombre: 'Rojo',    montura: '#77787C', lente: '#E8361D' },
       { id: 'lavanda', nombre: 'Lavanda', montura: '#C9B8F0', lente: '#E6B8F2' }
     ],
-    specs: [['Marca', 'Wanderth'], ['Peso', '25 g'], ['Montura', 'Sin aro: el lente va al aire'], ['Lente', 'Espejado, de una sola pieza'], ['Protección', 'Filtro UV400 categoría 3'], ['Tecnología', 'Antiempañante'], ['Ventilación', 'Ranuras laterales en el lente'], ['Fórmula', 'Acepta clip óptico'], ['Colores', 'Azul, plata, rojo, lavanda']],
+    specs: [['Marca', 'Wanderth'], ['Peso', '25 g'], ['Montura', 'Sin aro: el lente va al aire'], ['Lente', 'Espejado, de una sola pieza'], ['Protección', 'Filtro UV400 categoría 3'], ['Tecnología', 'Antiempañante'], ['Ventilación', 'Ranuras laterales en el lente'], ['Fórmula', 'Acepta clip óptico'], ['Garantía', '6 meses por defectos de fabricación'], ['Colores', 'Azul, plata, rojo, lavanda']],
     comparar: { diseno: 'Sin montura', ventilacion: 'Ranuras laterales en el lente' }
   }
 ];
@@ -1201,6 +1219,10 @@ function pintarPDP(g, i) {
       '<button class="btn btn-rx" type="button" data-rx="' + g.id + '">Lentes formulados</button>' +
       '<button class="btn btn-ink" type="button" data-comprar="' + g.id + '">Agregar al carrito · ' + cop(g.precio) + '</button>' +
       '<p class="regalo-nota"><svg viewBox="0 0 48 48" aria-hidden="true">' + ICONOS.regalo + '</svg><span>Con tus gafas te regalamos el <b>' + REGALO.nombre.toLowerCase() + '</b>: ' + REGALO.incluye.toLowerCase() + '.</span></p>' +
+      '<details class="garantia"><summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Garantía de <b>' + GARANTIA.meses + ' meses</b> por defectos de fabricación</span></summary>' +
+        '<div class="g-cuerpo"><p>Cubre:</p><ul>' + GARANTIA.cubre.map(function (d) { return '<li>' + d + '</li>'; }).join('') + '</ul>' +
+        '<p>' + GARANTIA.compromiso + '</p><p class="g-req">' + GARANTIA.requisito + '</p>' +
+        '<a href="terminos.html#garantia" target="_blank" rel="noopener">Ver condiciones completas</a></div></details>' +
       '<p class="nota-envio" data-nota="' + g.id + '"></p>' +
     '</div>';
   $('[data-specs="' + i + '"]').innerHTML = g.specs.map(function (r) { return '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>'; }).join('');
