@@ -645,13 +645,15 @@ function filasRango() {
     ['Esfera + cilindro', 'Hasta ' + fmtD(R.sumaMin)], ['Distancia pupilar', R.dpMin + ' a ' + R.dpMax + ' mm'],
     ['Tipo de lente', 'Visión sencilla (monofocal)'], ['Tallado', 'Digital, precio único']];
 }
-function recetaTexto(r) {
+function tieneDp(r) { return !!(r.dp && r.dp !== 'nose'); }
+function recetaTexto(r, paraWA) {
   function ojo(o) { return 'esf ' + fmtD(o.esf) + ' cil ' + fmtD(o.cil) + (+o.cil !== 0 ? ' eje ' + o.eje + '°' : ''); }
-  return 'OD ' + ojo(r.od) + ' · OI ' + ojo(r.oi) + (r.dp && r.dp !== 'nose' ? ' · DP ' + r.dp + ' mm' : '');
+  return 'OD ' + ojo(r.od) + ' · OI ' + ojo(r.oi) + (tieneDp(r) ? ' · DP ' + r.dp + ' mm'
+    : paraWA ? '. No tengo la DP: les envío una selfie con una tarjeta para medirla' : '. DP: la medimos con una selfie por WhatsApp');
 }
 function rxDetalle(r, paraWA) {
   if (!r || r.tipo === 'clip') return '';
-  if (r.modo === 'manual') return 'Fórmula: ' + recetaTexto(r.receta);
+  if (r.modo === 'manual') return 'Fórmula: ' + recetaTexto(r.receta, paraWA);
   if (r.modo === 'archivo') return FORMULA_WEBHOOK ? 'Fórmula: subida en la web (' + r.archivo + ')'
     : paraWA ? 'Fórmula: te envío la foto (' + r.archivo + ') por este chat' : 'Fórmula: adjunta la foto en el chat de WhatsApp al finalizar';
   return paraWA ? 'Fórmula: te la envío por este chat' : 'Fórmula: la envías por WhatsApp al finalizar';
@@ -814,7 +816,7 @@ function aplicarCodigo(c) { codigo = c; guardar('solare_codigo_v1', c); pintarCa
 
 /* ---------- Configurador de lentes formulados (flujo tipo Pixxiesx con un solo tipo de lente) ---------- */
 function ICONO(k) { return '<span class="ico"><svg viewBox="0 0 48 48" aria-hidden="true">' + ICONOS[k] + '</svg></span>'; }
-function recetaVacia() { return { od: { esf: '0', cil: '0', eje: '' }, oi: { esf: '0', cil: '0', eje: '' }, dp: '' }; }
+function recetaVacia() { return { od: { esf: '0', cil: '0', eje: '' }, oi: { esf: '0', cil: '0', eje: '' }, dp: '', dpSi: false }; }
 function abrirRx(gid) {
   if (carritoAbierto()) cerrarCarrito();
   if (!$('#promo').hidden) cerrarPromo(true);
@@ -856,7 +858,7 @@ function revisarReceta() {
   var sol = rx.flujo === 'sol';
   var a = revisarOjo('ojo derecho', r.od, sol), b = revisarOjo('ojo izquierdo', r.oi, sol);
   if (sol && !a && !b && rangoPorFormula(lenteSol(rx.lente), r) == null) a = 'fuera';
-  var dpFuera = r.dp && r.dp !== 'nose' && (+r.dp < R.dpMin || +r.dp > R.dpMax);
+  var dpFuera = tieneDp(r) && (+r.dp < R.dpMin || +r.dp > R.dpMax);
   if (a === 'fuera' || b === 'fuera' || dpFuera) return { ok: false, msg: 'Esta fórmula está fuera de los rangos que tallamos. <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas deportivas.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y te la cotizamos.' };
   if (a || b) return { ok: false, msg: a || b };
   if (+r.od.esf === 0 && +r.od.cil === 0 && +r.oi.esf === 0 && +r.oi.cil === 0) return { ok: false, msg: 'Tu fórmula quedó en 0.00 en los dos ojos. Revisa los valores o elige otra opción.' };
@@ -888,7 +890,8 @@ function pintarRx() {
       modos.map(function (m) {
         return '<button class="rx-op" type="button" data-rxmodo="' + m[0] + '" aria-pressed="' + (rx.modo === m[0]) + '">' + ICONO(m[0]) +
           '<span><span class="t">' + m[1] + '</span><span class="d">' + m[2] + '</span></span><span></span></button>' + (rx.modo === m[0] ? panelModo(m[0]) : '');
-      }).join('') + '<p class="rx-err" id="rxErr" hidden></p>';
+      }).join('') + '<p class="rx-rango rx-dpnota">¿Tu fórmula no trae la DP (distancia entre tus pupilas)? No pasa nada, casi nadie la sabe. Al terminar la compra te pedimos por WhatsApp una selfie sosteniendo una tarjeta y la medimos por ti.</p>' +
+      '<p class="rx-err" id="rxErr" hidden></p>';
   } else {
     var f = rxInfo({ tipo: rx.tipo, lente: rx.lente, modo: rx.modo, receta: rx.receta });
     var det = rx.tipo !== 'clip' ? rxDetalle({ tipo: rx.tipo, modo: rx.modo, receta: rx.receta, archivo: rx.archivo && rx.archivo.nombre }, false) : 'Para montar tus lentes en tu óptica.';
@@ -917,12 +920,13 @@ function panelModo(m) {
         '<select id="' + k + 'Cil" data-ojo="' + k + '" data-campo="cil" aria-label="Cilindro ' + lbl + '">' + opcionesNum(6, -6, .25, o.cil) + '</select>' +
         '<input type="text" id="' + k + 'Eje" data-ojo="' + k + '" data-campo="eje" inputmode="numeric" maxlength="3" placeholder="0–180" value="' + o.eje + '" aria-label="Eje ' + lbl + '"></div>';
     };
-    var dps = '<option value="">Elige</option><option value="nose"' + (r.dp === 'nose' ? ' selected' : '') + '>No la sé</option>';
+    var dps = '<option value="">Elige</option>';
     for (var d = 50; d <= 80; d++) dps += '<option value="' + d + '"' + (String(d) === r.dp ? ' selected' : '') + '>' + d + ' mm</option>';
     return '<div class="rx-extra"><div class="rx-tabla" role="group" aria-label="Fórmula"><div class="rx-fila rx-enc"><span></span><span>Esfera</span><span>Cilindro</span><span>Eje</span></div>' +
       fila('OD', 'od', r.od) + fila('OI', 'oi', r.oi) + '</div>' +
-      '<label class="rx-dp">Distancia pupilar (DP)<select id="rxDp" data-campo="dp">' + dps + '</select></label>' +
-      '<p class="rx-rango">OD es el ojo derecho y OI el izquierdo. Si no conoces tu DP, te ayudamos a medirla por WhatsApp.</p></div>';
+      '<p class="rx-rango">OD es el ojo derecho y OI el izquierdo.</p>' +
+      '<label class="rx-check"><input type="checkbox" id="rxDpSi" data-campo="dpsi"' + (r.dpSi ? ' checked' : '') + '> Mi fórmula trae la DP (distancia pupilar)</label>' +
+      (r.dpSi ? '<label class="rx-dp">Distancia pupilar (DP)<select id="rxDp" data-campo="dp">' + dps + '</select></label>' : '') + '</div>';
   }
   return '<div class="rx-extra"><p class="rx-rango" style="margin:0">Al finalizar la compra se abre WhatsApp con tu pedido. Ahí nos envías la foto de tu fórmula y empezamos el tallado cuando la revisemos.</p></div>';
 }
@@ -1072,6 +1076,7 @@ function conectarEventos() {
       rx.prev = /^image\//.test(f.type) ? URL.createObjectURL(f) : null;
       pintarRx(); return;
     }
+    if (el.dataset.campo === 'dpsi') { rx.receta.dpSi = el.checked; rx.receta.dp = ''; pintarRx(); return; }
     if (el.dataset.campo === 'dp') rx.receta.dp = el.value;
     else if (el.dataset.ojo) rx.receta[el.dataset.ojo][el.dataset.campo] = el.value;
     pintarRxPie();

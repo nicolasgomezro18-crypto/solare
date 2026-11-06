@@ -703,3 +703,13 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .rx-card .rx-precio small{font:500 .4em/1 var(--f-mono);letter-spacing:.04em;text-transform:uppercase;vertical-align:middle}
 .rx-rangos{margin:4px 0 0;padding:0;list-style:none;display:grid;gap:4px;font:400 12px/1.45 var(--f-mono);color:var(--muted)}
 .rx-card.on .rx-rangos{color:var(--cf-muted)}
+
+/* DP opcional */
+.rx-check{display:flex;align-items:center;gap:10px;font-size:.88rem;cursor:pointer;line-height:1.3}
+.rx-check input{width:18px;height:18px;flex:none;margin:0;accent-color:var(--ink)}
+.rx-dpnota{margin-top:4px}
+/* Fórmula en celular: el eje solo lleva 3 dígitos, así esfera y cilindro caben completos */
+@media (max-width:480px){
+  .rx-fila{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) 62px;gap:6px}
+  .rx-fila select{padding-inline:6px 2px;font-size:13px}
+}
