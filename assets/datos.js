@@ -22,6 +22,17 @@ var FORMULA = {
           desc: 'Tallamos tus lentes de forma digital y te llegan montados en el clip, listas para usar.' },
   rango: { esfMin: -6, esfMax: 4, cilMin: -2, sumaMin: -7, dpMin: 54, dpMax: 72 }
 };
+// Lentes formulados para gafas de sol: se tallan directo en la montura, con el mismo rango de FORMULA.rango.
+// PENDIENTE: precios que pasará Solare. Mientras precio sea null, la opción sale como "Precio por WhatsApp"
+// y el cliente pide la cotización con su fórmula en vez de agregar al carrito.
+var LENTES_SOL = [
+  { id: 'tinte', nombre: 'Policarbonato tintado negro', corto: 'tintado negro', precio: null,
+    desc: 'Lente de sol oscuro con tu fórmula, en policarbonato liviano y resistente.' },
+  { id: 'transitions', nombre: 'Transitions', corto: 'Transitions', precio: null,
+    desc: 'Claro bajo techo y oscuro al sol: te sirven para todo el día.' },
+  { id: 'blue', nombre: 'Blue protect', corto: 'blue protect', precio: null,
+    desc: 'Lente claro con filtro de luz azul para pantallas. Usas la montura como gafas formuladas.' }
+];
 var FORMULA_WEBHOOK = '';               // URL de n8n que recibe la foto de la fórmula (vacío = el cliente la adjunta en WhatsApp)
 var REGALO = { nombre: 'Kit de protección', incluye: 'Estuche rígido, funda y paño de microfibra' };
 // Garantía definida por Solare (5 nov 2026). Debe coincidir con la sección 8 de terminos.html.
@@ -34,13 +45,15 @@ var GARANTIA = {
 
 // Líneas de la tienda. estado: 'disponible' o 'pronto' (sale como "Próximamente" y no tiene página aún).
 var CATEGORIAS = [
-  { id: 'deportivas', nombre: 'Deportivas', url: '/deportivas/', estado: 'disponible',
+  { id: 'deportivas', nombre: 'Deportivas', url: '/deportivas/', estado: 'disponible', formula: 'clip', comparar: true,
     titulo: 'Deportivas en fibra de carbono',
     intro: 'Pocas, livianas y probadas. Elige el modelo y mira cada detalle antes de comprar.',
     datos: ['25 g', 'UV400 categoría 3', 'Tecnología antiempañante', 'Acepta fórmula', 'Garantía de 6 meses'] },
-  { id: 'lifestyle', nombre: 'Lifestyle', url: '', estado: 'pronto',
-    titulo: 'Lifestyle',
-    intro: 'Gafas de sol para el día a día. Estamos eligiendo los modelos y saldrán con fórmula disponible.' }
+  { id: 'lifestyle', nombre: 'Lifestyle', url: '/lifestyle/', estado: 'disponible', formula: 'sol',
+    titulo: 'Gafas de sol polarizadas',
+    intro: 'Modelos Ferrati elegidos para el día a día, para dama y caballero. Todos aceptan lentes formulados.',
+    datos: ['Polarizadas', 'UV400', 'Dama y caballero', 'Aceptan fórmula', 'Garantía de 6 meses'],
+    generos: [['dama', 'Dama'], ['caballero', 'Caballero']] }
 ];
 
 // Fotos: /img/<id>-<color>-<vista>.webp. El id no cambia aunque cambie el nombre comercial.
@@ -48,7 +61,8 @@ var CATEGORIAS = [
 var DE_CERCA = { varilla: 1, emblema: 1, puente: 1 };
 var GAFAS = [
   {
-    id: 'vertice', slug: 'maximus', categoria: 'deportivas', url: '/deportivas/maximus/',
+    id: 'vertice', slug: 'maximus', categoria: 'deportivas', url: '/deportivas/maximus/', plantilla: 'deportiva',
+    chips: ['25 g', 'UV400 cat. 3', 'Antiempañante', 'Fibra de carbono'],
     marca: 'Wanderth', nombre: 'Maximus', precio: 189900, peso: 25,
     tipo: 'Media montura ventilada', lema: 'Fibra de carbono que se ve y se siente.', ar: '2/1',
     carbono: true,
@@ -69,7 +83,8 @@ var GAFAS = [
     comparar: { diseno: 'Media montura ventilada', ventilacion: 'Ranuras en montura y lente' }
   },
   {
-    id: 'brisa', slug: 'speed-advance', categoria: 'deportivas', url: '/deportivas/speed-advance/',
+    id: 'brisa', slug: 'speed-advance', categoria: 'deportivas', url: '/deportivas/speed-advance/', plantilla: 'deportiva',
+    chips: ['25 g', 'UV400 cat. 3', 'Antiempañante'],
     marca: 'Wanderth', nombre: 'Speed Advance', precio: 189900, peso: 25,
     tipo: 'Sin montura', lema: 'Sin montura. Nada que estorbe la vista.', ar: '5/3',
     carbono: false,
@@ -89,6 +104,54 @@ var GAFAS = [
     comparar: { diseno: 'Sin montura', ventilacion: 'Ranuras laterales en el lente' }
   }
 ];
+
+// ---------- Lifestyle: gafas de sol Ferrati (referencias del catálogo Ferrati, 5 nov 2026) ----------
+// medida: [ancho del lente, puente, varilla] en mm, tal como viene impresa en la varilla.
+function solar(o) {
+  o.categoria = 'lifestyle'; o.plantilla = 'sol'; o.marca = 'Ferrati'; o.precio = 179900; o.ar = '5/3';
+  o.url = '/lifestyle/' + o.id + '/'; o.slug = o.id;
+  o.vistas = [['frente', 'Frente'], ['tres', 'Tres cuartos']];
+  o.chips = ['Polarizadas', 'UV400', o.material, o.forma];
+  o.specs = [['Marca', 'Ferrati'], ['Para', o.genero === 'dama' ? 'Dama' : 'Caballero'], ['Forma', o.forma], ['Material', o.material],
+    ['Medidas', o.medida.join(' - ') + ' mm (lente - puente - varilla)'], ['Lente', 'Polarizado'], ['Protección', 'UV400'],
+    ['Fórmula', 'Acepta lentes formulados'], ['Garantía', '6 meses por defectos de fabricación'],
+    ['Colores', o.colores.map(function (c) { return c.nombre; }).join(', ')]];
+  return o;
+}
+GAFAS.push(
+  solar({ id: 'ascona', codigo: '7300', genero: 'dama', nombre: 'Ascona', tipo: 'Cat-eye al aire', material: 'Metálica', forma: 'Cat-eye',
+    medida: [65, 15, 146], lema: 'Cat-eye sin aro: liviana y con carácter.',
+    colores: [
+      { id: 'c1', nombre: 'Negro',            montura: '#1B1B1D', lente: '#3A3B3E' },
+      { id: 'c2', nombre: 'Oro rosa',         montura: '#C99A7E', lente: '#2E3236' },
+      { id: 'c3', nombre: 'Café degradado',   montura: '#5A4535', lente: '#9A8A78' },
+      { id: 'c4', nombre: 'Morado degradado', montura: '#8A7A86', lente: '#6F5F75' }
+    ] }),
+  solar({ id: 'lugano', codigo: '10003', genero: 'dama', nombre: 'Lugano', tipo: 'Ovalada metálica', material: 'Metálica', forma: 'Ovalada',
+    medida: [55, 22, 147], lema: 'Ovaladas y finas, fáciles de llevar con todo.',
+    colores: [
+      { id: 'c1', nombre: 'Negro',    montura: '#1C1C1C', lente: '#2F2F31' },
+      { id: 'c3', nombre: 'Grafito',  montura: '#7A7A78', lente: '#6E6458' },
+      { id: 'c4', nombre: 'Oro rosa', montura: '#D9B8A3', lente: '#8B7D70' },
+      { id: 'c5', nombre: 'Gris',     montura: '#2D2D33', lente: '#56556A' }
+    ] }),
+  solar({ id: 'montreux', codigo: '9810P', genero: 'caballero', nombre: 'Montreux', tipo: 'Cuadrada de acetato', material: 'Acetato', forma: 'Cuadrada',
+    medida: [56, 16, 144], lema: 'Cuadrada de acetato grueso, hecha para destacar.',
+    colores: [
+      { id: 'c1', nombre: 'Negro',        montura: '#111111', lente: '#2C2D30' },
+      { id: 'c2', nombre: 'Negro y café', montura: '#141414', lente: '#5B4A32' },
+      { id: 'c4', nombre: 'Gris cristal', montura: '#9AA3AB', lente: '#2F3A40' },
+      { id: 'c8', nombre: 'Café',         montura: '#6B3A1F', lente: '#2E2E2E' }
+    ] }),
+  solar({ id: 'lucerne', codigo: '7246', genero: 'caballero', nombre: 'Lucerne', tipo: 'Rectangular metálica', material: 'Metálica', forma: 'Rectangular',
+    medida: [58, 17, 147], lema: 'Rectangular y metálica: sobria, liviana y para todos los días.',
+    colores: [
+      { id: 'c1', nombre: 'Negro',           montura: '#1B1B1B', lente: '#2E2E30' },
+      { id: 'c2', nombre: 'Grafito',         montura: '#6A6A6A', lente: '#2C3236' },
+      { id: 'c3', nombre: 'Dorado con azul', montura: '#C9A86A', lente: '#2C3B66' },
+      { id: 'c4', nombre: 'Plata con café',  montura: '#B9B1AA', lente: '#5A4D45' }
+    ] })
+);
 
 // Los "dulces de la fila": precios bajos que completan el envío gratis.
 // conGafas: precio cuando hay gafas en el carrito (una unidad por cada par). destacado: va primero en el carrito.

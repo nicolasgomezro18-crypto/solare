@@ -20,6 +20,17 @@ function colorDe(g, cid) { for (var i = 0; i < g.colores.length; i++) if (g.colo
 function foto(g, cid, vista) { return '/img/' + g.id + '-' + cid + '-' + vista + '.webp'; }
 function nombreVista(g, v) { for (var i = 0; i < g.vistas.length; i++) if (g.vistas[i][0] === v) return g.vistas[i][1]; return v; }
 function waLink(texto) { return 'https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(texto); }
+function lenteSol(id) { for (var i = 0; i < LENTES_SOL.length; i++) if (LENTES_SOL[i].id === id) return LENTES_SOL[i]; return null; }
+// Lente formulado de una línea del carrito o del configurador: { nombre, corto, precio, cotizar }
+function rxInfo(r) {
+  if (!r) return null;
+  if (r.tipo === 'sol') {
+    var l = lenteSol(r.lente);
+    return l ? { nombre: 'Lentes formulados ' + l.nombre, corto: 'Formulado ' + l.corto, precio: l.precio || 0, cotizar: l.precio == null } : null;
+  }
+  var f = FORMULA[r.tipo];
+  return f ? { nombre: f.nombre, corto: f.corto, precio: f.precio, cotizar: false } : null;
+}
 
 var sel = {};
 GAFAS.forEach(function (g) { sel[g.id] = { color: g.colores[0].id, vista: g.vistas[0][0] }; });
@@ -62,13 +73,13 @@ function prod(it) {
 }
 var carrito = leer('solare_carrito_v2', []).filter(function (it) {
   var p = prod(it);
-  return p && it.n > 0 && (it.tipo !== 'gafa' || (colorDe(p, it.color) && (!it.rx || FORMULA[it.rx.tipo])));
+  return p && it.n > 0 && (it.tipo !== 'gafa' || (colorDe(p, it.color) && (!it.rx || rxInfo(it.rx))));
 });
 var codigo = leer('solare_codigo_v1', '');
 var eraGratis = null;
 
 function nGafas() { var n = 0; carrito.forEach(function (it) { if (it.tipo === 'gafa') n += it.n; }); return n; }
-function precioGafa(it) { return gafa(it.id).precio + (it.rx ? FORMULA[it.rx.tipo].precio : 0); }
+function precioGafa(it) { return gafa(it.id).precio + (it.rx ? rxInfo(it.rx).precio : 0); }
 function unidadesAcc(id) { var n = 0; carrito.forEach(function (it) { if (it.tipo === 'acc' && it.id === id) n += it.n; }); return n; }
 // Los accesorios con precio "conGafas" van a ese precio hasta una unidad por cada par
 function totalLinea(it, ng) {
@@ -91,7 +102,7 @@ function totales() {
 function guardarCarrito() { guardar('solare_carrito_v2', carrito); }
 // rx: null, { tipo: 'clip' } o { tipo: 'lab', modo, receta?, archivo? }. Cada fórmula tallada va en su propia línea.
 function agregar(tipo, id, color, abrir, rx) {
-  var k = tipo + ':' + id + (color ? ':' + color : '') + (rx ? ':' + (rx.tipo === 'lab' ? 'lab-' + Date.now() : 'clip') : '');
+  var k = tipo + ':' + id + (color ? ':' + color : '') + (rx ? ':' + (rx.tipo === 'clip' ? 'clip' : 'rx-' + Date.now()) : '');
   var it = null;
   carrito.forEach(function (x) { if (x.k === k) it = x; });
   if (it) it.n = Math.min(10, it.n + 1);
@@ -113,7 +124,7 @@ function marcoArriba(pagina, cat, g) {
   var sub = '';
   if (g) {
     sub = '<div class="subnav" id="subnav" aria-hidden="true" inert><div class="wrap"><b>' + g.nombre + '</b>' +
-      '<nav aria-label="Secciones del producto"><a href="#proteccion">Protección</a>' + (g.detalles && g.detalles.length ? '<a href="#detalles">Detalles</a>' : '') +
+      '<nav aria-label="Secciones del producto"><a href="#proteccion">Protección</a>' + (g.plantilla === 'sol' ? '<a href="#medidas">Medidas</a>' : g.detalles && g.detalles.length ? '<a href="#detalles">Detalles</a>' : '') +
       '<a href="#comprar">Colores</a><a href="#specs">Especificaciones</a></nav>' +
       '<span class="sn-precio">' + cop(g.precio) + '</span><a class="btn btn-sun btn-mini" href="#comprar">Comprar</a></div></div>';
   }
@@ -170,7 +181,7 @@ function marcoAbajo() {
         '<button class="linkbtn no-gracias" type="button" id="noGracias">No, gracias</button></form>' +
       '<div class="promo-form" id="leadOk" hidden><h2>Listo, ya tienes tu <span data-pct>10</span>%</h2><p>Tu código quedó aplicado en el carrito. Si compras por WhatsApp, menciónalo y lo respetamos.</p>' +
         '<div class="ok-code"><span id="okCode"></span><button class="btn btn-line btn-mini" type="button" id="copyCode">Copiar</button></div><button class="btn btn-sun" type="button" id="okVer">Ver las gafas</button></div>' +
-      '<div class="promo-art" aria-hidden="true"><img src="/img/vertice-azul-varilla.webp" alt="" loading="lazy"><p class="promo-big"><span data-pct>10</span>%</p><p>en tu primera compra</p></div>' +
+      '<div class="promo-art carbon" aria-hidden="true"><p class="promo-big"><span data-pct>10</span>%</p><p>en tu primera compra</p></div>' +
     '</div></div></div>' +
     // Configurador de lentes formulados
     '<div class="modal" id="rx" hidden><div class="rx-box" id="rxBox" role="dialog" aria-modal="true" aria-labelledby="rxTitulo" tabindex="-1">' +
@@ -193,13 +204,15 @@ function swatchesHTML(g, conNombre) {
       '<i style="--m:' + c.montura + ';--l:' + c.lente + '"></i>' + (conNombre ? '<span>' + c.nombre + '</span>' : '') + '</button>';
   }).join('');
 }
+// Columnas de la grilla según cuántas tarjetas hay (evita una sola tarjeta suelta en la última fila)
+function nCols(n) { return n <= 2 ? n : n % 4 === 0 ? 4 : 3; }
 function tarjetaHTML(g) {
-  return '<article class="tarjeta">' +
+  return '<article class="tarjeta"' + (g.genero ? ' data-genero="' + g.genero + '"' : '') + '>' +
     '<a class="tarjeta-img" href="' + g.url + '" aria-label="Ver ' + g.nombre + '"><img data-f="' + g.id + ':frente" src="' + foto(g, sel[g.id].color, 'frente') + '" alt="Gafas ' + g.marca + ' ' + g.nombre + '" loading="lazy"></a>' +
     '<div class="tarjeta-info"><p class="marca">' + g.marca + '</p>' +
       '<div class="fila"><h3><a href="' + g.url + '">' + g.nombre + '</a></h3><span class="precio">' + cop(g.precio) + '</span></div>' +
       '<p class="tipo">' + g.tipo + '</p>' +
-      '<div class="chips"><span class="chipf">' + g.peso + ' g</span><span class="chipf">UV400 cat. 3</span><span class="chipf">Antiempañante</span>' + (g.carbono ? '<span class="chipf">Fibra de carbono</span>' : '') + '</div>' +
+      '<div class="chips">' + (g.chips || []).map(function (c) { return '<span class="chipf">' + c + '</span>'; }).join('') + '</div>' +
       '<div class="sws" role="radiogroup" aria-label="Color de ' + g.nombre + '">' + swatchesHTML(g, false) + '</div>' +
       '<div class="acciones"><a class="btn btn-ink" href="' + g.url + '">Ver detalles</a><button class="btn btn-line btn-icono" type="button" data-comprar="' + g.id + '" aria-label="Agregar ' + g.nombre + ' al carrito"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>' +
     '</div></article>';
@@ -261,6 +274,40 @@ function formulaHTML(lista) {
     '<p class="rango-nota">¿Tu fórmula está fuera de este rango o usas progresivos? <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas deportivas.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y la revisamos.</p>' +
     '<div class="rx-botones">' + lista.map(function (g) { return '<button class="btn btn-ink" type="button" data-rx="' + g.id + '">Configurar ' + g.nombre + ' con fórmula</button>'; }).join('') + '</div>';
 }
+function formulaSolHTML(lista) {
+  return '<p class="eyebrow rv">Fórmula</p><h2 class="h2 rv">También las hacemos con tu fórmula.</h2>' +
+    '<p class="intro rv">Tallamos los lentes directo en la montura. Elige el modelo y toca «Lentes formulados» para escoger el tipo de lente.</p>' +
+    '<div class="rx-cards tres">' + LENTES_SOL.map(function (l, i) {
+      return '<article class="rx-card' + (i === 0 ? ' on' : '') + ' rv"><span class="label">Opción ' + (i + 1) + '</span><h3>' + l.nombre + '</h3>' +
+        '<p class="rx-precio">' + (l.precio != null ? cop(l.precio) : 'Por cotizar') + '</p><p>' + l.desc + '</p></article>';
+    }).join('') + '</div>' +
+    '<h3 class="specs-tit">Rango de fórmula que tallamos</h3><dl class="specs">' + filasRango().filter(function (r) { return r[0] !== 'Tallado'; }).map(function (r) { return '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>'; }).join('') + '</dl>' +
+    '<p class="rango-nota">¿Tu fórmula está fuera de este rango o usas progresivos? <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas de sol.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y la revisamos.</p>' +
+    '<a class="btn btn-ink" href="#modelos" style="margin-top:28px">Elegir modelo</a>';
+}
+function filtrosHTML(cat) {
+  if (!cat.generos) return '';
+  var lista = gafasDe(cat.id);
+  return '<div class="filtros" role="group" aria-label="Filtrar por">' +
+    '<button class="filtro" type="button" data-genero="todas" aria-pressed="true">Todas <span>' + lista.length + '</span></button>' +
+    cat.generos.map(function (gn) {
+      return '<button class="filtro" type="button" data-genero="' + gn[0] + '" aria-pressed="false">' + gn[1] + ' <span>' + lista.filter(function (g) { return g.genero === gn[0]; }).length + '</span></button>';
+    }).join('') + '</div>';
+}
+function filtrar(gen) {
+  $$('.filtro').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.genero === gen); });
+  var vistas = 0;
+  $$('#modelos .tarjeta').forEach(function (t) { t.hidden = gen !== 'todas' && t.dataset.genero !== gen; if (!t.hidden) vistas++; });
+  var grilla = $('#modelos .tarjetas');
+  if (grilla) grilla.className = 'tarjetas n' + nCols(vistas);
+  try { history.replaceState(null, '', gen === 'todas' ? location.pathname : '#' + gen); } catch (e) {}
+}
+function medidasSVG(g) {
+  return '<svg class="medidas-svg" viewBox="0 0 640 214" role="img" aria-label="Esquema: A es el ancho del lente y B el puente">' +
+    '<rect x="40" y="52" width="240" height="116" rx="46"/><rect x="360" y="52" width="240" height="116" rx="46"/><path d="M280 86c26-18 54-18 80 0"/>' +
+    '<path class="cota" d="M40 186h240M40 178v16M280 178v16"/><text x="160" y="210" text-anchor="middle">A · ' + g.medida[0] + ' mm</text>' +
+    '<path class="cota" d="M280 32h80M280 24v16M360 24v16"/><text x="320" y="16" text-anchor="middle">B · ' + g.medida[1] + ' mm</text></svg>';
+}
 function accesoriosHTML() {
   return '<div class="sec-head"><div><p class="label">Complementos</p><h2 class="h2s">Accesorios para tus gafas</h2></div><p>Pequeños, útiles y a buen precio. Suma uno y acércate a tu envío gratis.</p></div>' +
     '<div class="grid-a">' + ACCESORIOS.map(function (a) {
@@ -281,12 +328,13 @@ function beneficiosHTML() {
   }).join('') + '</div></section>';
 }
 function dropsHTML() {
-  var n = GAFAS.length, colores = 0; GAFAS.forEach(function (g) { colores += g.colores.length; });
   return '<section class="sec banda carbon drops" id="lanzamientos"><div class="wrap centro">' +
     '<p class="eyebrow rv">Cómo lanzamos</p><h2 class="h2 rv">Pocos modelos. Elegidos uno a uno.</h2>' +
     '<p class="intro rv">No sacamos colecciones de cien referencias. Lanzamos por etapas y solo cuando un modelo nos convence.</p>' +
-    '<div class="drop-list"><article class="drop on"><span class="estado">Disponible</span><span class="num">01</span><h3>Deportivas en fibra de carbono</h3><p>' + n + ' modelos y ' + colores + ' combinaciones de color.</p><a class="btn btn-sun" href="/deportivas/">Ver deportivas</a></article>' +
-    '<article class="drop off"><span class="estado">Próximamente</span><span class="num">02</span><h3>Lifestyle</h3><p>Gafas de sol para el día a día, también con fórmula. Si quieres saberlo antes que nadie, te escribimos el día del lanzamiento.</p><a class="btn btn-line" href="' + waLink('Hola Solare, quiero que me avisen cuando salga la línea lifestyle.') + '" target="_blank" rel="noopener">Avísame por WhatsApp</a></article></div>' +
+    '<div class="drop-list tres">' +
+      '<article class="drop on"><span class="estado">Disponible</span><span class="num">01</span><h3>Deportivas en fibra de carbono</h3><p>' + gafasDe('deportivas').length + ' modelos de 25 g con UV400 categoría 3.</p><a class="btn btn-sun" href="/deportivas/">Ver deportivas</a></article>' +
+      '<article class="drop on"><span class="estado">Disponible</span><span class="num">02</span><h3>Lifestyle</h3><p>' + gafasDe('lifestyle').length + ' modelos de sol polarizados para dama y caballero.</p><a class="btn btn-sun" href="/lifestyle/">Ver lifestyle</a></article>' +
+      '<article class="drop off"><span class="estado">Próximamente</span><span class="num">03</span><h3>Lo que viene</h3><p>Ya estamos probando el siguiente modelo. Si quieres saberlo antes que nadie, te escribimos el día del lanzamiento.</p><a class="btn btn-line" href="' + waLink('Hola Solare, quiero que me avisen del próximo lanzamiento.') + '" target="_blank" rel="noopener">Avísame por WhatsApp</a></article></div>' +
     '</div></section>';
 }
 
@@ -295,7 +343,7 @@ function paginaInicio() {
   var dep = gafasDe('deportivas'), g0 = dep[0];
   return '<section class="hero inicio-hero" id="inicio"><div class="wrap">' +
       '<p class="eyebrow"><b>Solare</b> · Drop 01</p><h1>Elegidas una a una.</h1>' +
-      '<p class="lema">Pocos modelos, probados y bien escogidos. Empezamos con deportivas en fibra de carbono de 25 gramos.</p>' +
+      '<p class="lema">Pocos modelos, probados y bien escogidos: deportivas en fibra de carbono de 25 gramos y gafas de sol polarizadas.</p>' +
       '<img class="hero-img foto" data-f="' + g0.id + ':frente" src="' + foto(g0, sel[g0.id].color, 'frente') + '" width="767" height="382" fetchpriority="high" alt="Gafas ' + g0.marca + ' ' + g0.nombre + '">' +
       '<div class="hero-buy"><a class="btn btn-sun" href="/deportivas/">Ver deportivas</a><a class="btn btn-line" href="#lineas">Ver líneas</a></div>' +
     '</div></section>' +
@@ -303,15 +351,15 @@ function paginaInicio() {
       CATEGORIAS.map(function (c) {
         if (c.estado === 'disponible') {
           var g = gafasDe(c.id)[0];
-          return '<a class="linea linea-on rv" href="' + c.url + '"><span class="label">' + gafasDe(c.id).length + ' modelos</span><h3>' + c.nombre + '</h3><p>' + c.titulo + '. ' + (c.datos || []).slice(0, 3).join(' · ') + '.</p>' +
+          return '<a class="linea linea-on rv" href="' + c.url + '"><span class="label">' + gafasDe(c.id).length + ' modelos</span><h3>' + c.nombre + '</h3><p>' + c.titulo + '.</p><div class="chips">' + (c.datos || []).slice(0, 3).map(function (d) { return '<span class="chipf">' + d + '</span>'; }).join('') + '</div>' +
             '<span class="btn btn-ink">Ver ' + c.nombre.toLowerCase() + '</span><img src="' + foto(g, (g.colores[1] || g.colores[0]).id, 'tres') + '" alt="" loading="lazy"></a>';
         }
         return '<div class="linea linea-off carbon rv"><span class="label">Próximamente</span><h3>' + c.nombre + '</h3><p>' + c.intro + '</p>' +
           '<a class="btn btn-sun" href="' + waLink('Hola Solare, quiero que me avisen cuando salga la línea ' + c.nombre.toLowerCase() + '.') + '" target="_blank" rel="noopener">Avísame por WhatsApp</a></div>';
       }).join('') + '</div></div></section>' +
-    '<section class="sec seccion-papel" id="destacados"><div class="wrap centro"><p class="eyebrow rv">Disponibles ahora</p><h2 class="h2 rv">Deportivas de 25 gramos</h2>' +
-      '<div class="tarjetas" style="margin-top:clamp(28px,4vw,48px)">' + dep.map(tarjetaHTML).join('') + '</div>' +
-      '<a class="btn btn-line" href="/deportivas/" style="margin-top:28px">Ver la línea deportiva</a></div></section>' +
+    '<section class="sec seccion-papel" id="destacados"><div class="wrap centro"><p class="eyebrow rv">Disponibles ahora</p><h2 class="h2 rv">Toda la colección</h2>' +
+      '<div class="tarjetas n' + nCols(GAFAS.length) + '" style="margin-top:clamp(28px,4vw,48px)">' + GAFAS.map(tarjetaHTML).join('') + '</div>' +
+      '<div class="rx-botones">' + CATEGORIAS.filter(function (c) { return c.estado === 'disponible'; }).map(function (c) { return '<a class="btn btn-line" href="' + c.url + '">Ver ' + c.nombre.toLowerCase() + '</a>'; }).join('') + '</div></div></section>' +
     dropsHTML() +
     '<section class="sec" id="accesorios"><div class="wrap">' + accesoriosHTML() + '</div></section>' +
     beneficiosHTML();
@@ -322,14 +370,15 @@ function paginaCategoria(cat) {
   return '<section class="cat-hero"><div class="wrap">' + migasHTML([['Inicio', '/'], [cat.nombre]]) +
       '<p class="eyebrow">Línea</p><h1>' + cat.titulo + '</h1><p class="intro">' + cat.intro + '</p>' +
       '<div class="chips">' + (cat.datos || []).map(function (d) { return '<span class="chipf">' + d + '</span>'; }).join('') + '</div></div></section>' +
-    '<section class="sec seccion-papel" id="modelos" style="padding-top:clamp(36px,5vw,64px)"><div class="wrap centro"><div class="tarjetas">' + lista.map(tarjetaHTML).join('') + '</div></div></section>' +
-    (lista.length > 1 ? '<section class="sec" id="comparar"><div class="wrap centro"><p class="eyebrow rv">Comparar</p><h2 class="h2 rv">' + lista.map(function (g) { return g.nombre; }).join(' o ') + '</h2>' + compararHTML(lista) +
+    '<section class="sec seccion-papel" id="modelos" style="padding-top:clamp(36px,5vw,64px)"><div class="wrap centro">' + filtrosHTML(cat) + '<div class="tarjetas n' + nCols(lista.length) + '">' + lista.map(tarjetaHTML).join('') + '</div></div></section>' +
+    (cat.comparar && lista.length > 1 ? '<section class="sec" id="comparar"><div class="wrap centro"><p class="eyebrow rv">Comparar</p><h2 class="h2 rv">' + lista.map(function (g) { return g.nombre; }).join(' o ') + '</h2>' + compararHTML(lista) +
       '<p class="comp-nota">Todas pesan 25 g, tienen filtro UV400 categoría 3, tecnología antiempañante, aceptan fórmula y tienen ' + GARANTIA.meses + ' meses de garantía.</p></div></section>' : '') +
-    '<section class="sec seccion-papel" id="formula"><div class="wrap centro">' + formulaHTML(lista) + '</div></section>' +
+    '<section class="sec' + (cat.comparar ? ' seccion-papel' : '') + '" id="formula"><div class="wrap centro">' + (cat.formula === 'sol' ? formulaSolHTML(lista) : formulaHTML(lista)) + '</div></section>' +
     beneficiosHTML();
 }
 
 function paginaProducto(g) {
+  if (g.plantilla === 'sol') return paginaProductoSol(g);
   var cat = categoria(g.categoria), c0 = sel[g.id].color;
   var h = '<section class="hero" id="inicio"><div class="wrap">' + migasHTML([['Inicio', '/'], [cat.nombre, cat.url], [g.nombre]]) +
       '<p class="eyebrow"><b>Nuevo</b> · ' + g.marca + ' · ' + (g.carbono ? 'Fibra de carbono' : g.tipo) + '</p>' +
@@ -384,7 +433,42 @@ function paginaProducto(g) {
     '<p class="rango-nota">¿Usas fórmula? Mira <a href="' + cat.url + '#formula">cómo funcionan los lentes formulados</a> y el rango que tallamos.</p></div></section>';
   // Otros modelos de la misma línea
   var otros = gafasDe(g.categoria).filter(function (x) { return x.id !== g.id; });
-  if (otros.length) h += '<section class="sec" id="otros"><div class="wrap centro"><p class="eyebrow rv">' + cat.nombre + '</p><h2 class="h2 rv">También te puede gustar</h2><div class="tarjetas" style="margin-top:clamp(28px,4vw,48px)">' + otros.map(tarjetaHTML).join('') + '</div></div></section>';
+  if (otros.length) h += '<section class="sec" id="otros"><div class="wrap centro"><p class="eyebrow rv">' + cat.nombre + '</p><h2 class="h2 rv">También te puede gustar</h2><div class="tarjetas n' + nCols(otros.length) + '" style="margin-top:clamp(28px,4vw,48px)">' + otros.map(tarjetaHTML).join('') + '</div></div></section>';
+  return h + beneficiosHTML();
+}
+
+function paginaProductoSol(g) {
+  var cat = categoria(g.categoria), c0 = sel[g.id].color, gen = g.genero === 'dama' ? 'Dama' : 'Caballero';
+  var h = '<section class="hero" id="inicio"><div class="wrap">' + migasHTML([['Inicio', '/'], [cat.nombre, cat.url], [gen, cat.url + '#' + g.genero], [g.nombre]]) +
+      '<p class="eyebrow"><b>Nuevo</b> · ' + g.marca + ' · ' + gen + '</p><h1>' + g.nombre + '</h1><p class="lema">' + g.lema + '</p>' +
+      '<p class="tipo">Polarizadas · UV400 · ' + g.material + ' · ' + g.forma + '</p>' +
+      '<img class="hero-img foto" data-f="' + g.id + ':frente" src="' + foto(g, c0, 'frente') + '" fetchpriority="high" alt="Gafas de sol ' + g.marca + ' ' + g.nombre + ' de frente">' +
+      '<div class="hero-buy"><span class="precio">' + cop(g.precio) + '</span><a class="btn btn-sun" href="#comprar">Comprar</a><a class="btn btn-line" href="#medidas">Ver medidas</a></div>' +
+      '<div class="sws" role="radiogroup" aria-label="Color">' + swatchesHTML(g, true) + '</div>' +
+    '</div></section>' +
+    // Lente polarizado y protección UV
+    '<section class="prot" id="proteccion" aria-label="Lente polarizado y protección UV"><div class="wrap">' +
+      '<article class="ptile ptile-osc carbon rv"><p class="label">Lente</p><p class="pbig ancha">Polarizadas</p><h3>Adiós a los reflejos</h3>' +
+        '<p class="txt">El filtro polarizado corta el brillo que rebota en el agua, el asfalto, los carros y los vidrios. Ves más nítido y descansas la vista.</p></article>' +
+      '<article class="ptile ptile-cla rv"><p class="label">Protección</p><p class="pbig">UV400</p><h3>Protección real, no solo un lente oscuro</h3>' +
+        '<p class="txt">Bloquean los rayos UVA y UVB hasta 400 nm.</p></article>' +
+    '</div></section>' +
+    // Medidas
+    '<section class="sec seccion-blanca" id="medidas"><div class="wrap centro"><p class="eyebrow rv">Medidas</p><h2 class="h2 rv">¿Te van a quedar bien?</h2>' +
+      '<p class="intro rv">Compáralas con unas gafas que ya tengas: estos tres números suelen venir impresos por dentro de la varilla.</p>' + medidasSVG(g) +
+      '<div class="medidas">' + [['Ancho del lente', g.medida[0], 'De lado a lado de un lente.'], ['Puente', g.medida[1], 'El espacio sobre la nariz.'], ['Varilla', g.medida[2], 'Largo de la patilla hasta la oreja.']].map(function (m, i) {
+        return '<div class="medida rv"><span>' + 'ABC'.charAt(i) + ' · ' + m[0] + '</span><b>' + m[1] + '<small>mm</small></b><p>' + m[2] + '</p></div>';
+      }).join('') + '</div>' +
+      '<p class="rango-nota">Ancho frontal aproximado: ' + (g.medida[0] * 2 + g.medida[1]) + ' mm. ¿Dudas con la talla? <a href="' + waLink('Hola Solare, tengo dudas con la talla de las ' + g.marca + ' ' + g.nombre + '.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a>.</p>' +
+    '</div></section>' +
+    // Comprar
+    '<section class="sec seccion-papel" id="comprar"><div class="wrap centro"><p class="eyebrow rv">Colores y ángulos</p><h2 class="h2 rv">Elige tu color.</h2>' + pdpHTML(g) +
+      '<h3 class="specs-tit" id="specs">Especificaciones</h3><dl class="specs">' + specsHTML(g) + '</dl>' +
+      '<p class="rango-nota">¿Usas fórmula? Mira <a href="' + cat.url + '#formula">los lentes formulados</a> que tallamos para estas monturas.</p></div></section>';
+  // Otros modelos: primero los del mismo género
+  var otros = gafasDe(g.categoria).filter(function (x) { return x.id !== g.id; })
+    .sort(function (a, b) { return (b.genero === g.genero) - (a.genero === g.genero); });
+  if (otros.length) h += '<section class="sec" id="otros"><div class="wrap centro"><p class="eyebrow rv">' + cat.nombre + '</p><h2 class="h2 rv">También te puede gustar</h2><div class="tarjetas n' + nCols(otros.length) + '" style="margin-top:clamp(28px,4vw,48px)">' + otros.map(tarjetaHTML).join('') + '</div></div></section>';
   return h + beneficiosHTML();
 }
 
@@ -398,11 +482,11 @@ function pintarComunes() {
 function pintarAnuncio() {
   var items = [
     'Envío gratis desde <b>' + cop(ENVIO_GRATIS_DESDE) + '</b>',
-    'Pesan solo <b>25 gramos</b>',
+    'Deportivas en fibra de carbono de <b>25 gramos</b>',
+    'Gafas de sol polarizadas: <b>' + cop(Math.min.apply(null, gafasDe('lifestyle').map(function (g) { return g.precio; }))) + '</b>',
     '<button type="button" data-promo><b>' + BIENVENIDA.porcentaje + '%</b> en tu primera compra</button>',
-    'Filtro <b>UV400 categoría 3</b>',
     REGALO.nombre + ' <b>de regalo</b> con tus gafas',
-    'Lentes formulados con tallado digital: <b>' + cop(FORMULA.lab.precio) + '</b>',
+    'Lentes formulados en deportivas: <b>' + cop(FORMULA.lab.precio) + '</b>',
     'Garantía de <b>' + GARANTIA.meses + ' meses</b>'
   ];
   var grupo = items.map(function (h) { return '<span class="mq-item">' + h + '</span>'; }).join('');
@@ -422,7 +506,6 @@ function elegirColor(gid, cid) {
   $$('img[data-stage="' + gid + '"]').forEach(function (img) { ponerFoto(img, foto(g, cid, s.vista)); });
   $$('[data-p="' + gid + '"][data-c]').forEach(function (b) { b.setAttribute('aria-checked', b.dataset.c === cid); });
   $$('[data-cn="' + gid + '"]').forEach(function (el) { el.textContent = colorDe(g, cid).nombre; });
-  if (g.carbono) $('.promo-art img').src = foto(g, cid, 'varilla');
 }
 function elegirVista(gid, v) {
   var g = gafa(gid), s = sel[gid], img = $('img[data-stage="' + gid + '"]');
@@ -534,7 +617,7 @@ function recetaTexto(r) {
   return 'OD ' + ojo(r.od) + ' · OI ' + ojo(r.oi) + (r.dp && r.dp !== 'nose' ? ' · DP ' + r.dp + ' mm' : '');
 }
 function rxDetalle(r, paraWA) {
-  if (!r || r.tipo !== 'lab') return '';
+  if (!r || r.tipo === 'clip') return '';
   if (r.modo === 'manual') return 'Fórmula: ' + recetaTexto(r.receta);
   if (r.modo === 'archivo') return FORMULA_WEBHOOK ? 'Fórmula: subida en la web (' + r.archivo + ')'
     : paraWA ? 'Fórmula: te envío la foto (' + r.archivo + ') por este chat' : 'Fórmula: adjunta la foto en el chat de WhatsApp al finalizar';
@@ -576,12 +659,12 @@ function pintarCarrito() {
     var c = esGafa ? colorDe(p, it.color) : null;
     var linea = totalLinea(it, t.ng), lleno = esGafa ? precioGafa(it) * it.n : p.precio * it.n;
     var detalle = esGafa
-      ? ['Color ' + c.nombre, it.rx ? FORMULA[it.rx.tipo].corto : '', it.n > 1 ? cop(precioGafa(it)) + ' c/u' : ''].filter(Boolean).join(' · ')
+      ? ['Color ' + c.nombre, it.rx ? rxInfo(it.rx).corto : '', it.n > 1 ? cop(precioGafa(it)) + ' c/u' : ''].filter(Boolean).join(' · ')
       : linea < lleno ? 'Mitad de precio con tus gafas <s>' + cop(lleno) + '</s>' : 'Accesorio';
     return '<li class="item" data-k="' + it.k + '">' +
       '<div class="item-img' + (esGafa ? '' : ' acc') + '">' + (esGafa ? '<a href="' + p.url + '"><img class="foto" src="' + foto(p, it.color, 'mini') + '" alt="' + p.nombre + '"></a>' : iconoAcc(p.icono)) + '</div>' +
       '<div class="item-info"><h3>' + (esGafa ? p.marca + ' ' + p.nombre : p.nombre) + '</h3><p class="var">' + detalle + '</p>' +
-        (esGafa && it.rx && it.rx.tipo === 'lab' ? '<p class="rx-linea">' + rxDetalle(it.rx, false) + '</p>' : '') +
+        (esGafa && it.rx && it.rx.tipo !== 'clip' ? '<p class="rx-linea">' + rxDetalle(it.rx, false) + '</p>' : '') +
         '<div class="item-ctrl"><div class="qty">' +
           '<button type="button" data-q="-1" aria-label="Quitar una unidad"' + (it.n <= 1 ? ' disabled' : '') + '>−</button>' +
           '<output aria-label="Cantidad">' + it.n + '</output>' +
@@ -643,8 +726,8 @@ function linkWhatsApp(t) {
   carrito.forEach(function (it) {
     var p = prod(it), linea = totalLinea(it, t.ng);
     if (it.tipo === 'gafa') {
-      l.push('• ' + it.n + ' × ' + p.marca + ' ' + p.nombre + ' (color ' + colorDe(p, it.color).nombre + ')' + (it.rx ? ' + ' + FORMULA[it.rx.tipo].nombre.toLowerCase() : '') + ': ' + cop(linea));
-      if (it.rx && it.rx.tipo === 'lab') l.push('   ' + rxDetalle(it.rx, true));
+      l.push('• ' + it.n + ' × ' + p.marca + ' ' + p.nombre + ' (color ' + colorDe(p, it.color).nombre + ')' + (it.rx ? ' + ' + rxInfo(it.rx).nombre.toLowerCase() : '') + ': ' + cop(linea));
+      if (it.rx && it.rx.tipo !== 'clip') l.push('   ' + rxDetalle(it.rx, true));
     } else {
       l.push('• ' + it.n + ' × ' + p.nombre + (linea < p.precio * it.n ? ' (mitad de precio con las gafas)' : '') + ': ' + cop(linea));
     }
@@ -702,7 +785,7 @@ function recetaVacia() { return { od: { esf: '0', cil: '0', eje: '' }, oi: { esf
 function abrirRx(gid) {
   if (carritoAbierto()) cerrarCarrito();
   if (!$('#promo').hidden) cerrarPromo(true);
-  rx = { gid: gid, color: sel[gid].color, tipo: null, modo: null, paso: 1, receta: recetaVacia(), archivo: null, file: null, prev: null };
+  rx = { gid: gid, color: sel[gid].color, flujo: categoria(gafa(gid).categoria).formula || 'clip', tipo: null, lente: null, modo: null, paso: 1, receta: recetaVacia(), archivo: null, file: null, prev: null };
   focoRx = document.activeElement;
   $('#rx').hidden = false;
   bloquear();
@@ -748,7 +831,14 @@ function pintarRx() {
   $('#rxPaso').textContent = 'Paso ' + (rx.tipo === 'clip' && rx.paso === 3 ? 2 : rx.paso) + ' de ' + (rx.tipo === 'clip' ? 2 : 3);
   $('#rxAtras').style.visibility = rx.paso > 1 ? 'visible' : 'hidden';
   var h = '';
-  if (rx.paso === 1) {
+  if (rx.paso === 1 && rx.flujo === 'sol') {
+    h = '<h2 id="rxTitulo">¿Qué lente quieres?</h2><p class="rx-sub">' + g.marca + ' ' + g.nombre + ' · ' + c.nombre + '</p>' +
+      LENTES_SOL.map(function (l) {
+        return '<button class="rx-op" type="button" data-rxlente="' + l.id + '" aria-pressed="' + (rx.lente === l.id) + '">' + ICONO('lab') +
+          '<span><span class="t">' + l.nombre + '</span><span class="d">' + l.desc + '</span></span><span class="mas">' + (l.precio != null ? '+' + cop(l.precio) : 'Por cotizar') + '</span></button>';
+      }).join('') +
+      '<p class="rx-rango">Tallamos los lentes directo en la montura, para fórmulas de visión sencilla con esfera de ' + fmtD(FORMULA.rango.esfMin) + ' a ' + fmtD(FORMULA.rango.esfMax) + ' y cilindro hasta ' + fmtD(FORMULA.rango.cilMin) + '.</p>';
+  } else if (rx.paso === 1) {
     h = '<h2 id="rxTitulo">¿Cómo quieres tu fórmula?</h2><p class="rx-sub">' + g.marca + ' ' + g.nombre + ' · ' + c.nombre + '</p>' +
       ['clip', 'lab'].map(function (k) {
         var f = FORMULA[k];
@@ -764,11 +854,11 @@ function pintarRx() {
           '<span><span class="t">' + m[1] + '</span><span class="d">' + m[2] + '</span></span><span></span></button>' + (rx.modo === m[0] ? panelModo(m[0]) : '');
       }).join('') + '<p class="rx-err" id="rxErr" hidden></p>';
   } else {
-    var f = FORMULA[rx.tipo];
-    var det = rx.tipo === 'lab' ? rxDetalle({ tipo: 'lab', modo: rx.modo, receta: rx.receta, archivo: rx.archivo && rx.archivo.nombre }, false) : 'Para montar tus lentes en tu óptica.';
-    h = '<h2 id="rxTitulo">Revisa y agrega</h2><div class="rx-resumen">' +
+    var f = rxInfo({ tipo: rx.tipo, lente: rx.lente });
+    var det = rx.tipo !== 'clip' ? rxDetalle({ tipo: rx.tipo, modo: rx.modo, receta: rx.receta, archivo: rx.archivo && rx.archivo.nombre }, false) : 'Para montar tus lentes en tu óptica.';
+    h = '<h2 id="rxTitulo">' + (f.cotizar ? 'Revisa y cotiza' : 'Revisa y agrega') + '</h2><div class="rx-resumen">' +
       '<div class="rx-res"><span class="ico"><img src="' + foto(g, rx.color, 'mini') + '" alt=""></span><span><h3>' + g.marca + ' ' + g.nombre + '</h3><p>Color ' + c.nombre + '</p></span><span class="mono">' + cop(g.precio) + '</span></div>' +
-      '<div class="rx-res">' + ICONO(rx.tipo) + '<span><h3>' + f.nombre + '</h3><p>' + det + '</p></span><span class="mono">' + cop(f.precio) + '</span></div>' +
+      '<div class="rx-res">' + ICONO(rx.tipo === 'sol' ? 'lab' : rx.tipo) + '<span><h3>' + f.nombre + '</h3><p>' + det + '</p></span><span class="mono">' + (f.cotizar ? 'Por cotizar' : cop(f.precio)) + '</span></div>' +
       '<div class="rx-res">' + ICONO('regalo') + '<span><h3>' + REGALO.nombre + '</h3><p>Te lo regalamos por tu compra: ' + REGALO.incluye.toLowerCase() + '.</p></span><span class="gratis">Gratis</span></div></div>';
   }
   $('#rxBody').innerHTML = h;
@@ -800,11 +890,11 @@ function panelModo(m) {
   return '<div class="rx-extra"><p class="rx-rango" style="margin:0">Al finalizar la compra se abre WhatsApp con tu pedido. Ahí nos envías la foto de tu fórmula y empezamos el tallado cuando la revisemos.</p></div>';
 }
 function pintarRxPie() {
-  var g = gafa(rx.gid), f = rx.tipo ? FORMULA[rx.tipo] : null;
+  var g = gafa(rx.gid), f = rx.tipo ? rxInfo({ tipo: rx.tipo, lente: rx.lente }) : null;
   $('#rxMarco').textContent = cop(g.precio);
   $('#rxLenteRow').hidden = !f;
-  if (f) { $('#rxLenteLbl').textContent = f.corto; $('#rxLente').textContent = cop(f.precio); }
-  $('#rxTotal').textContent = cop(g.precio + (f ? f.precio : 0));
+  if (f) { $('#rxLenteLbl').textContent = f.corto; $('#rxLente').textContent = f.cotizar ? 'Por cotizar' : cop(f.precio); }
+  $('#rxTotal').textContent = cop(g.precio + (f ? f.precio : 0)) + (f && f.cotizar ? ' + lente' : '');
   var b = $('#rxSiguiente'), ok = false;
   if (rx.paso === 1) ok = !!rx.tipo;
   else if (rx.paso === 2) {
@@ -813,14 +903,15 @@ function pintarRxPie() {
     if (err) { err.hidden = !v.msg; err.innerHTML = v.msg || ''; }
   } else ok = true;
   b.disabled = !ok;
-  b.textContent = rx.paso === 3 ? 'Agregar al carrito · ' + cop(g.precio + f.precio) : 'Continuar';
+  b.textContent = rx.paso !== 3 ? 'Continuar' : f.cotizar ? 'Cotizar por WhatsApp' : 'Agregar al carrito · ' + cop(g.precio + f.precio);
 }
 function agregarCombo(gid) {
   $$('[data-combo="' + gid + '"]:checked').forEach(function (c) { agregar('acc', c.value, '', false); c.checked = false; });
 }
 function agregarDesdeRx() {
   var r = { tipo: rx.tipo };
-  if (rx.tipo === 'lab') {
+  if (rx.tipo === 'sol') r.lente = rx.lente;
+  if (rx.tipo !== 'clip') {
     r.modo = rx.modo;
     if (rx.modo === 'manual') r.receta = JSON.parse(JSON.stringify(rx.receta));
     if (rx.modo === 'archivo') {
@@ -831,6 +922,16 @@ function agregarDesdeRx() {
         try { fetch(FORMULA_WEBHOOK, { method: 'POST', mode: 'no-cors', body: fd }).catch(function () {}); } catch (e) {}
       }
     }
+  }
+  var info = rxInfo(r);
+  if (info.cotizar) {
+    // Lente sin precio publicado: se pide la cotización por WhatsApp con la fórmula
+    var g = gafa(rx.gid);
+    var texto = 'Hola Solare, quiero cotizar las ' + g.marca + ' ' + g.nombre + ' (color ' + colorDe(g, rx.color).nombre + ', ' + cop(g.precio) + ') con ' + info.nombre.toLowerCase() + '.\n' + rxDetalle(r, true);
+    var a = document.createElement('a'); a.href = waLink(texto); a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    cerrarRx();
+    return;
   }
   var gid = rx.gid, color = rx.color;
   cerrarRx();
@@ -843,6 +944,7 @@ function agregarDesdeRx() {
 function conectarEventos() {
   document.addEventListener('click', function (e) {
     var t = e.target, b;
+    if ((b = t.closest('.filtro'))) { filtrar(b.dataset.genero); return; }
     if ((b = t.closest('[data-c][data-p]'))) { elegirColor(b.dataset.p, b.dataset.c); return; }
     if ((b = t.closest('.thumb'))) { elegirVista(b.dataset.p, b.dataset.vista); return; }
     if ((b = t.closest('[data-paso]'))) { pasoVista(b.dataset.p, Number(b.dataset.paso)); return; }
@@ -917,6 +1019,7 @@ function conectarEventos() {
   $('#rx').addEventListener('click', function (e) {
     var b;
     if (e.target === $('#rx')) { cerrarRx(); return; }
+    if ((b = e.target.closest('[data-rxlente]'))) { rx.tipo = 'sol'; rx.lente = b.dataset.rxlente; pintarRx(); return; }
     if ((b = e.target.closest('[data-rxtipo]'))) { rx.tipo = b.dataset.rxtipo; pintarRx(); return; }
     if ((b = e.target.closest('[data-rxmodo]'))) { rx.modo = b.dataset.rxmodo; pintarRx(); }
   });
@@ -979,14 +1082,15 @@ function enviarLead(e) {
 
 /* ---------- Barra fija del producto ---------- */
 function iniciarSubnav() {
-  var sn = $('#subnav'), ancla = $('#inicio .hero-buy');
+  // Se vigila toda la sección de inicio: si se observara solo el botón y este cargara fuera de pantalla, la barra nunca aparecería
+  var sn = $('#subnav'), ancla = $('#inicio');
   if (!sn || !ancla || !('IntersectionObserver' in window)) return;
   new IntersectionObserver(function (es) {
     var on = !es[0].isIntersecting && es[0].boundingClientRect.top < 0;
     sn.classList.toggle('on', on);
     sn.setAttribute('aria-hidden', on ? 'false' : 'true');
     if (on) sn.removeAttribute('inert'); else sn.setAttribute('inert', '');
-  }, { rootMargin: '-80px 0px 0px 0px', threshold: .15 }).observe(ancla);
+  }, { rootMargin: '-120px 0px 0px 0px', threshold: 0 }).observe(ancla);
 }
 
 /* ---------- Inicio ---------- */
@@ -1003,6 +1107,10 @@ function iniciarSubnav() {
   conectarEventos();
   pintarCarrito();
   if (g) { animarPeso(g.peso); iniciarComparador(); iniciarSubnav(); }
+  if (cat && cat.generos && !g) {
+    var h = location.hash.slice(1);
+    if (cat.generos.some(function (x) { return x[0] === h; })) filtrar(h);
+  }
   if (codigo) { $('#leadForm').hidden = true; $('#leadOk').hidden = false; }
   if (!leer('solare_popup_v1', 0) && !codigo) setTimeout(abrirPromo, POPUP_ESPERA_MS);
   // Precarga las fotos de los colores de esta página cuando ya está quieta, para que cambiar de color sea instantáneo
