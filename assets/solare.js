@@ -22,14 +22,39 @@ function nombreVista(g, v) { for (var i = 0; i < g.vistas.length; i++) if (g.vis
 function waLink(texto) { return 'https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(texto); }
 function lenteSol(id) { for (var i = 0; i < LENTES_SOL.length; i++) if (LENTES_SOL[i].id === id) return LENTES_SOL[i]; return null; }
 // Lente formulado de una línea del carrito o del configurador: { nombre, corto, precio, cotizar }
+function desdeLente(l) { return l.rangos && l.rangos.length ? Math.min.apply(null, l.rangos.map(function (rg) { return rg.precio; })) : null; }
+// Rango de precio que cubre la fórmula: el del ojo que quede más alto. null si algún ojo no cabe en ningún rango.
+function rangoPorFormula(l, receta) {
+  var elegido = null, ok = true;
+  ['od', 'oi'].forEach(function (k) {
+    var t = transponer(receta[k]), m = null;
+    (l.rangos || []).forEach(function (rg) { if (!m && t.esf >= rg.esf[0] && t.esf <= rg.esf[1] && t.cil >= rg.cil[0] && t.cil <= rg.cil[1]) m = rg; });
+    if (!m) ok = false; else if (!elegido || m.precio > elegido.precio) elegido = m;
+  });
+  return ok ? elegido : null;
+}
+// El primer rango es el precio base; los demás se muestran como "ajuste por fórmula alta"
+function textoBase(l) { var b = l.rangos[0]; return 'Base: esf. ' + fmtD(b.esf[0]) + ' a ' + fmtD(b.esf[1]) + ' y cil. hasta ' + fmtD(b.cil[0]); }
+function motivoAjuste(rg, l) { var b = l.rangos[0]; return rg.cil[1] !== 0 ? 'cilindro alto (' + fmtD(rg.cil[1]) + ' a ' + fmtD(rg.cil[0]) + ')' : 'esfera alta (más allá de ' + fmtD(b.esf[0]) + ' / ' + fmtD(b.esf[1]) + ')'; }
+function textoAjustes(l) {
+  return l.rangos.slice(1).map(function (rg) { return 'Fórmula alta, ' + motivoAjuste(rg, l) + ': +' + cop(rg.precio - l.rangos[0].precio); });
+}
+// Desde cuánto se ofrece fórmula en una gafa (botón de la caja de compra)
+function rxDesde(g) {
+  return categoria(g.categoria).formula === 'sol' ? Math.min.apply(null, LENTES_SOL.map(desdeLente)) : FORMULA.clip.precio;
+}
+// Lente formulado de una línea del carrito o del configurador: { nombre, corto, precio, desde, cotizar }
 function rxInfo(r) {
   if (!r) return null;
   if (r.tipo === 'sol') {
     var l = lenteSol(r.lente);
-    return l ? { nombre: 'Lentes formulados ' + l.nombre, corto: 'Formulado ' + l.corto, precio: l.precio || 0, cotizar: l.precio == null } : null;
+    if (!l) return null;
+    var rg = r.modo === 'manual' && r.receta ? rangoPorFormula(l, r.receta) : null, base = desdeLente(l) || 0;
+    return { nombre: 'Lentes formulados ' + l.nombre, corto: 'Formulado ' + l.corto, base: base, ajuste: rg ? rg.precio - base : 0,
+      ajusteTxt: rg && rg.precio > base ? 'Tu fórmula tiene ' + motivoAjuste(rg, l) : '', precio: rg ? rg.precio : base, desde: !rg, cotizar: desdeLente(l) == null };
   }
   var f = FORMULA[r.tipo];
-  return f ? { nombre: f.nombre, corto: f.corto, precio: f.precio, cotizar: false } : null;
+  return f ? { nombre: f.nombre, corto: f.corto, base: f.precio, ajuste: 0, precio: f.precio, cotizar: false } : null;
 }
 
 var sel = {};
@@ -187,7 +212,7 @@ function marcoAbajo() {
     '<div class="modal" id="rx" hidden><div class="rx-box" id="rxBox" role="dialog" aria-modal="true" aria-labelledby="rxTitulo" tabindex="-1">' +
       '<div class="rx-head"><button class="icon-btn" id="rxAtras" type="button" aria-label="Paso anterior">' + svgFlecha('M19 12H5M11 6l-6 6 6 6') + '</button><p class="rx-paso" id="rxPaso"></p><button class="icon-btn" id="rxCerrar" type="button" aria-label="Cerrar">' + SVG_X + '</button></div>' +
       '<div class="rx-body" id="rxBody"></div>' +
-      '<div class="rx-foot"><dl class="rx-sum"><div><dt>Gafas</dt><dd id="rxMarco"></dd></div><div id="rxLenteRow" hidden><dt id="rxLenteLbl"></dt><dd id="rxLente"></dd></div><div class="grand"><dt>Subtotal</dt><dd id="rxTotal"></dd></div></dl>' +
+      '<div class="rx-foot"><dl class="rx-sum"><div><dt>Gafas</dt><dd id="rxMarco"></dd></div><div id="rxLenteRow" hidden><dt id="rxLenteLbl"></dt><dd id="rxLente"></dd></div><div id="rxAjusteRow" hidden><dt>Ajuste por fórmula alta</dt><dd id="rxAjuste"></dd></div><div class="grand"><dt>Subtotal</dt><dd id="rxTotal"></dd></div></dl>' +
         '<button class="btn btn-sun" id="rxSiguiente" type="button" disabled>Continuar</button></div>' +
     '</div></div>';
 }
@@ -249,7 +274,7 @@ function pdpHTML(g) {
       '<p class="color-lbl">Color: <b data-cn="' + g.id + '">' + c.nombre + '</b></p>' +
       '<div class="sws" role="radiogroup" aria-label="Color de ' + g.nombre + '">' + swatchesHTML(g, false) + '</div>' +
       comboHTML(g) +
-      '<button class="btn btn-rx" type="button" data-rx="' + g.id + '">Lentes formulados</button>' +
+      '<button class="btn btn-rx" type="button" data-rx="' + g.id + '">Lentes formulados · desde ' + cop(rxDesde(g)) + '</button>' + progHTML(g, true) +
       '<button class="btn btn-ink" type="button" data-comprar="' + g.id + '">Agregar al carrito · ' + cop(g.precio) + '</button>' +
       '<p class="regalo-nota"><svg viewBox="0 0 48 48" aria-hidden="true">' + ICONOS.regalo + '</svg><span>Con tus gafas te regalamos el <b>' + REGALO.nombre.toLowerCase() + '</b>: ' + REGALO.incluye.toLowerCase() + '.</span></p>' +
       garantiaHTML() +
@@ -271,7 +296,8 @@ function formulaHTML(lista) {
     '<div class="rx-cards"><article class="rx-card rv"><span class="label">Opción 1</span><h3>Clip para fórmula</h3><p class="rx-precio">' + cop(FORMULA.clip.precio) + '</p><p>El sobrepuesto óptico que va por dentro de las gafas. Lo llevas a tu óptica de confianza y allá le montan tus lentes.</p></article>' +
     '<article class="rx-card on rv"><span class="label">Opción 2 · La más fácil</span><h3>Lentes formulados Solare</h3><p class="rx-precio">' + cop(FORMULA.lab.precio) + '</p><p>Tallamos tus lentes de forma digital, los montamos en el clip y te llegan listas para usar. Un solo precio para cualquier fórmula dentro del rango.</p></article></div>' +
     '<h3 class="specs-tit">Rango de fórmula que tallamos</h3><dl class="specs">' + filasRango().map(function (r) { return '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>'; }).join('') + '</dl>' +
-    '<p class="rango-nota">¿Tu fórmula está fuera de este rango o usas progresivos? <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas deportivas.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y la revisamos.</p>' +
+    '<p class="rango-nota">¿Tu fórmula está fuera de este rango? <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas deportivas.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y la revisamos.</p>' +
+    '<div class="prog-wrap">' + progHTML(null) + '</div>' +
     '<div class="rx-botones">' + lista.map(function (g) { return '<button class="btn btn-ink" type="button" data-rx="' + g.id + '">Configurar ' + g.nombre + ' con fórmula</button>'; }).join('') + '</div>';
 }
 function formulaSolHTML(lista) {
@@ -279,10 +305,10 @@ function formulaSolHTML(lista) {
     '<p class="intro rv">Tallamos los lentes directo en la montura. Elige el modelo y toca «Lentes formulados» para escoger el tipo de lente.</p>' +
     '<div class="rx-cards tres">' + LENTES_SOL.map(function (l, i) {
       return '<article class="rx-card' + (i === 0 ? ' on' : '') + ' rv"><span class="label">Opción ' + (i + 1) + '</span><h3>' + l.nombre + '</h3>' +
-        '<p class="rx-precio">' + (l.precio != null ? cop(l.precio) : 'Por cotizar') + '</p><p>' + l.desc + '</p></article>';
+        '<p class="rx-precio"><small>Desde</small> ' + cop(desdeLente(l)) + '</p><p>' + l.desc + '</p><ul class="rx-rangos">' + [textoBase(l)].concat(textoAjustes(l)).map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul></article>';
     }).join('') + '</div>' +
-    '<h3 class="specs-tit">Rango de fórmula que tallamos</h3><dl class="specs">' + filasRango().filter(function (r) { return r[0] !== 'Tallado'; }).map(function (r) { return '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>'; }).join('') + '</dl>' +
-    '<p class="rango-nota">¿Tu fórmula está fuera de este rango o usas progresivos? <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas de sol.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y la revisamos.</p>' +
+    '<p class="rango-nota">Precios por par en lentes monofocales con protección UV400. Si tu fórmula es alta, el lente lleva un tallado más preciso y tiene un ajuste que ves antes de pagar. ¿Queda fuera de estos rangos? <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas de sol.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a>.</p>' +
+    '<div class="prog-wrap">' + progHTML(null) + '</div>' +
     '<a class="btn btn-ink" href="#modelos" style="margin-top:28px">Elegir modelo</a>';
 }
 function filtrosHTML(cat) {
@@ -307,6 +333,13 @@ function medidasSVG(g) {
     '<rect x="40" y="52" width="240" height="116" rx="46"/><rect x="360" y="52" width="240" height="116" rx="46"/><path d="M280 86c26-18 54-18 80 0"/>' +
     '<path class="cota" d="M40 186h240M40 178v16M280 178v16"/><text x="160" y="210" text-anchor="middle">A · ' + g.medida[0] + ' mm</text>' +
     '<path class="cota" d="M280 32h80M280 24v16M360 24v16"/><text x="320" y="16" text-anchor="middle">B · ' + g.medida[1] + ' mm</text></svg>';
+}
+// ¿Usas progresivos? Asesoría gratuita con optómetra por WhatsApp
+function progHTML(g, corto) {
+  var txt = 'Hola Solare, uso lentes progresivos y quiero la asesoría gratuita con optómetra' + (g ? ' para unas ' + g.marca + ' ' + g.nombre : '') + '.';
+  return '<a class="prog' + (corto ? ' prog-corto' : '') + '" href="' + waLink(txt) + '" target="_blank" rel="noopener">' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>' +
+    '<span><b>¿Tienes lentes progresivos?</b>Asesoría gratuita con optómetra por WhatsApp.</span><span class="flecha" aria-hidden="true">→</span></a>';
 }
 function accesoriosHTML() {
   return '<div class="sec-head"><div><p class="label">Complementos</p><h2 class="h2s">Accesorios para tus gafas</h2></div><p>Pequeños, útiles y a buen precio. Suma uno y acércate a tu envío gratis.</p></div>' +
@@ -664,7 +697,7 @@ function pintarCarrito() {
     return '<li class="item" data-k="' + it.k + '">' +
       '<div class="item-img' + (esGafa ? '' : ' acc') + '">' + (esGafa ? '<a href="' + p.url + '"><img class="foto" src="' + foto(p, it.color, 'mini') + '" alt="' + p.nombre + '"></a>' : iconoAcc(p.icono)) + '</div>' +
       '<div class="item-info"><h3>' + (esGafa ? p.marca + ' ' + p.nombre : p.nombre) + '</h3><p class="var">' + detalle + '</p>' +
-        (esGafa && it.rx && it.rx.tipo !== 'clip' ? '<p class="rx-linea">' + rxDetalle(it.rx, false) + '</p>' : '') +
+        (esGafa && it.rx && it.rx.tipo !== 'clip' ? '<p class="rx-linea">' + rxDetalle(it.rx, false) + (it.rx.tipo === 'sol' ? (rxInfo(it.rx).desde ? '. Precio base: si tu fórmula es alta, te contamos el ajuste' : rxInfo(it.rx).ajuste ? '. Incluye ajuste por fórmula alta (+' + cop(rxInfo(it.rx).ajuste) + ')' : '') : '') + '</p>' : '') +
         '<div class="item-ctrl"><div class="qty">' +
           '<button type="button" data-q="-1" aria-label="Quitar una unidad"' + (it.n <= 1 ? ' disabled' : '') + '>−</button>' +
           '<output aria-label="Cantidad">' + it.n + '</output>' +
@@ -727,7 +760,7 @@ function linkWhatsApp(t) {
     var p = prod(it), linea = totalLinea(it, t.ng);
     if (it.tipo === 'gafa') {
       l.push('• ' + it.n + ' × ' + p.marca + ' ' + p.nombre + ' (color ' + colorDe(p, it.color).nombre + ')' + (it.rx ? ' + ' + rxInfo(it.rx).nombre.toLowerCase() : '') + ': ' + cop(linea));
-      if (it.rx && it.rx.tipo !== 'clip') l.push('   ' + rxDetalle(it.rx, true));
+      if (it.rx && it.rx.tipo !== 'clip') l.push('   ' + rxDetalle(it.rx, true) + (it.rx.tipo === 'sol' ? (rxInfo(it.rx).desde ? ' (precio base; confirmar ajuste según la fórmula)' : rxInfo(it.rx).ajuste ? ' (incluye ajuste por fórmula alta: +' + cop(rxInfo(it.rx).ajuste) + ')' : '') : ''));
     } else {
       l.push('• ' + it.n + ' × ' + p.nombre + (linea < p.precio * it.n ? ' (mitad de precio con las gafas)' : '') + ': ' + cop(linea));
     }
@@ -808,9 +841,10 @@ function opcionesNum(desde, hasta, paso, actual) {
 }
 function transponer(o) { var esf = Number(o.esf), cil = Number(o.cil); return cil > 0 ? { esf: esf + cil, cil: -cil } : { esf: esf, cil: cil }; }
 // '' = bien, 'fuera' = fuera de rango, otro texto = dato faltante
-function revisarOjo(nombre, o) {
+function revisarOjo(nombre, o, sinRango) {
   var R = FORMULA.rango, t = transponer(o);
   if (Number(o.cil) !== 0 && !(o.eje !== '' && +o.eje >= 0 && +o.eje <= 180)) return 'Escribe el eje del ' + nombre + ' (0 a 180). Está junto al cilindro en tu fórmula.';
+  if (sinRango) return '';
   if (t.esf < R.esfMin || t.esf > R.esfMax || t.cil < R.cilMin || t.esf + t.cil < R.sumaMin) return 'fuera';
   return '';
 }
@@ -819,9 +853,11 @@ function revisarReceta() {
   if (rx.modo === 'archivo') return { ok: !!rx.archivo };
   if (rx.modo !== 'manual') return { ok: false };
   var r = rx.receta, R = FORMULA.rango;
-  var a = revisarOjo('ojo derecho', r.od), b = revisarOjo('ojo izquierdo', r.oi);
+  var sol = rx.flujo === 'sol';
+  var a = revisarOjo('ojo derecho', r.od, sol), b = revisarOjo('ojo izquierdo', r.oi, sol);
+  if (sol && !a && !b && rangoPorFormula(lenteSol(rx.lente), r) == null) a = 'fuera';
   var dpFuera = r.dp && r.dp !== 'nose' && (+r.dp < R.dpMin || +r.dp > R.dpMax);
-  if (a === 'fuera' || b === 'fuera' || dpFuera) return { ok: false, msg: 'Esta fórmula está fuera del rango que tallamos a precio único. <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas deportivas.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y te la cotizamos.' };
+  if (a === 'fuera' || b === 'fuera' || dpFuera) return { ok: false, msg: 'Esta fórmula está fuera de los rangos que tallamos. <a href="' + waLink('Hola Solare, quiero saber si pueden tallar mi fórmula en unas gafas deportivas.') + '" target="_blank" rel="noopener">Escríbenos por WhatsApp</a> y te la cotizamos.' };
   if (a || b) return { ok: false, msg: a || b };
   if (+r.od.esf === 0 && +r.od.cil === 0 && +r.oi.esf === 0 && +r.oi.cil === 0) return { ok: false, msg: 'Tu fórmula quedó en 0.00 en los dos ojos. Revisa los valores o elige otra opción.' };
   return { ok: true };
@@ -835,9 +871,9 @@ function pintarRx() {
     h = '<h2 id="rxTitulo">¿Qué lente quieres?</h2><p class="rx-sub">' + g.marca + ' ' + g.nombre + ' · ' + c.nombre + '</p>' +
       LENTES_SOL.map(function (l) {
         return '<button class="rx-op" type="button" data-rxlente="' + l.id + '" aria-pressed="' + (rx.lente === l.id) + '">' + ICONO('lab') +
-          '<span><span class="t">' + l.nombre + '</span><span class="d">' + l.desc + '</span></span><span class="mas">' + (l.precio != null ? '+' + cop(l.precio) : 'Por cotizar') + '</span></button>';
+          '<span><span class="t">' + l.nombre + '</span><span class="d">' + l.desc + '</span><span class="rg">' + [textoBase(l)].concat(textoAjustes(l)).join('<br>') + '</span></span><span class="mas">Desde<br>' + cop(desdeLente(l)) + '</span></button>';
       }).join('') +
-      '<p class="rx-rango">Tallamos los lentes directo en la montura, para fórmulas de visión sencilla con esfera de ' + fmtD(FORMULA.rango.esfMin) + ' a ' + fmtD(FORMULA.rango.esfMax) + ' y cilindro hasta ' + fmtD(FORMULA.rango.cilMin) + '.</p>';
+      '<p class="rx-rango">Lentes monofocales con protección UV400, tallados directo en la montura. Si tu fórmula es alta, verás el ajuste antes de pagar.</p>' + progHTML(g);
   } else if (rx.paso === 1) {
     h = '<h2 id="rxTitulo">¿Cómo quieres tu fórmula?</h2><p class="rx-sub">' + g.marca + ' ' + g.nombre + ' · ' + c.nombre + '</p>' +
       ['clip', 'lab'].map(function (k) {
@@ -845,7 +881,7 @@ function pintarRx() {
         return '<button class="rx-op" type="button" data-rxtipo="' + k + '" aria-pressed="' + (rx.tipo === k) + '">' + ICONO(k) +
           '<span><span class="t">' + (k === 'lab' ? 'Lentes formulados Solare' : f.nombre) + '</span><span class="d">' + f.desc + '</span></span><span class="mas">+' + cop(f.precio) + '</span></button>';
       }).join('') +
-      '<p class="rx-rango">Tallamos a precio único fórmulas de visión sencilla con esfera de ' + fmtD(FORMULA.rango.esfMin) + ' a ' + fmtD(FORMULA.rango.esfMax) + ' y cilindro hasta ' + fmtD(FORMULA.rango.cilMin) + '.</p>';
+      '<p class="rx-rango">Tallamos a precio único fórmulas de visión sencilla con esfera de ' + fmtD(FORMULA.rango.esfMin) + ' a ' + fmtD(FORMULA.rango.esfMax) + ' y cilindro hasta ' + fmtD(FORMULA.rango.cilMin) + '.</p>' + progHTML(g);
   } else if (rx.paso === 2) {
     var modos = [['archivo', 'Subir foto o archivo', 'Una foto clara de tu fórmula médica.'], ['manual', 'Ingresarla a mano', 'Esfera, cilindro y eje de cada ojo.'], ['despues', 'Enviarla después por WhatsApp', 'Terminas la compra y nos la mandas por el chat.']];
     h = '<h2 id="rxTitulo">Agrega tu fórmula</h2><p class="rx-sub">No tallamos nada hasta revisarla. Tu fórmula es un dato sensible: solo la usamos para tus lentes (<a href="/privacidad.html#sensibles" target="_blank" rel="noopener">ver política</a>).</p>' +
@@ -854,11 +890,12 @@ function pintarRx() {
           '<span><span class="t">' + m[1] + '</span><span class="d">' + m[2] + '</span></span><span></span></button>' + (rx.modo === m[0] ? panelModo(m[0]) : '');
       }).join('') + '<p class="rx-err" id="rxErr" hidden></p>';
   } else {
-    var f = rxInfo({ tipo: rx.tipo, lente: rx.lente });
+    var f = rxInfo({ tipo: rx.tipo, lente: rx.lente, modo: rx.modo, receta: rx.receta });
     var det = rx.tipo !== 'clip' ? rxDetalle({ tipo: rx.tipo, modo: rx.modo, receta: rx.receta, archivo: rx.archivo && rx.archivo.nombre }, false) : 'Para montar tus lentes en tu óptica.';
     h = '<h2 id="rxTitulo">' + (f.cotizar ? 'Revisa y cotiza' : 'Revisa y agrega') + '</h2><div class="rx-resumen">' +
       '<div class="rx-res"><span class="ico"><img src="' + foto(g, rx.color, 'mini') + '" alt=""></span><span><h3>' + g.marca + ' ' + g.nombre + '</h3><p>Color ' + c.nombre + '</p></span><span class="mono">' + cop(g.precio) + '</span></div>' +
-      '<div class="rx-res">' + ICONO(rx.tipo === 'sol' ? 'lab' : rx.tipo) + '<span><h3>' + f.nombre + '</h3><p>' + det + '</p></span><span class="mono">' + (f.cotizar ? 'Por cotizar' : cop(f.precio)) + '</span></div>' +
+      '<div class="rx-res">' + ICONO(rx.tipo === 'sol' ? 'lab' : rx.tipo) + '<span><h3>' + f.nombre + '</h3><p>' + det + (f.desde && rx.tipo === 'sol' ? '<br>Es el precio base. Si tu fórmula es alta, te contamos el ajuste antes de tallar.' : '') + '</p></span><span class="mono">' + (f.cotizar ? 'Por cotizar' : (f.desde && rx.tipo === 'sol' ? 'Desde ' : '') + cop(f.base)) + '</span></div>' +
+      (f.ajuste ? '<div class="rx-res">' + ICONO('lab') + '<span><h3>Ajuste por fórmula alta</h3><p>' + f.ajusteTxt + '. Este tipo de fórmula lleva un tallado más preciso.</p></span><span class="mono">+' + cop(f.ajuste) + '</span></div>' : '') +
       '<div class="rx-res">' + ICONO('regalo') + '<span><h3>' + REGALO.nombre + '</h3><p>Te lo regalamos por tu compra: ' + REGALO.incluye.toLowerCase() + '.</p></span><span class="gratis">Gratis</span></div></div>';
   }
   $('#rxBody').innerHTML = h;
@@ -890,11 +927,14 @@ function panelModo(m) {
   return '<div class="rx-extra"><p class="rx-rango" style="margin:0">Al finalizar la compra se abre WhatsApp con tu pedido. Ahí nos envías la foto de tu fórmula y empezamos el tallado cuando la revisemos.</p></div>';
 }
 function pintarRxPie() {
-  var g = gafa(rx.gid), f = rx.tipo ? rxInfo({ tipo: rx.tipo, lente: rx.lente }) : null;
+  var g = gafa(rx.gid), f = rx.tipo ? rxInfo({ tipo: rx.tipo, lente: rx.lente, modo: rx.modo, receta: rx.receta }) : null;
+  var desde = f && f.desde && rx.tipo === 'sol' ? 'Desde ' : '';
   $('#rxMarco').textContent = cop(g.precio);
   $('#rxLenteRow').hidden = !f;
-  if (f) { $('#rxLenteLbl').textContent = f.corto; $('#rxLente').textContent = f.cotizar ? 'Por cotizar' : cop(f.precio); }
-  $('#rxTotal').textContent = cop(g.precio + (f ? f.precio : 0)) + (f && f.cotizar ? ' + lente' : '');
+  if (f) { $('#rxLenteLbl').textContent = f.corto; $('#rxLente').textContent = f.cotizar ? 'Por cotizar' : desde + cop(f.base); }
+  $('#rxAjusteRow').hidden = !(f && f.ajuste);
+  if (f && f.ajuste) $('#rxAjuste').textContent = '+' + cop(f.ajuste);
+  $('#rxTotal').textContent = (desde ? 'Desde ' : '') + cop(g.precio + (f ? f.precio : 0)) + (f && f.cotizar ? ' + lente' : '');
   var b = $('#rxSiguiente'), ok = false;
   if (rx.paso === 1) ok = !!rx.tipo;
   else if (rx.paso === 2) {
@@ -903,7 +943,7 @@ function pintarRxPie() {
     if (err) { err.hidden = !v.msg; err.innerHTML = v.msg || ''; }
   } else ok = true;
   b.disabled = !ok;
-  b.textContent = rx.paso !== 3 ? 'Continuar' : f.cotizar ? 'Cotizar por WhatsApp' : 'Agregar al carrito · ' + cop(g.precio + f.precio);
+  b.textContent = rx.paso !== 3 ? 'Continuar' : f.cotizar ? 'Cotizar por WhatsApp' : 'Agregar al carrito · ' + desde.toLowerCase() + cop(g.precio + f.precio);
 }
 function agregarCombo(gid) {
   $$('[data-combo="' + gid + '"]:checked').forEach(function (c) { agregar('acc', c.value, '', false); c.checked = false; });

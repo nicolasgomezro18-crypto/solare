@@ -22,16 +22,28 @@ var FORMULA = {
           desc: 'Tallamos tus lentes de forma digital y te llegan montados en el clip, listas para usar.' },
   rango: { esfMin: -6, esfMax: 4, cilMin: -2, sumaMin: -7, dpMin: 54, dpMax: 72 }
 };
-// Lentes formulados para gafas de sol: se tallan directo en la montura, con el mismo rango de FORMULA.rango.
-// PENDIENTE: precios que pasará Solare. Mientras precio sea null, la opción sale como "Precio por WhatsApp"
-// y el cliente pide la cotización con su fórmula en vez de agregar al carrito.
+// Lentes formulados para gafas de sol: se tallan directo en la montura (policarbonato, sirve también para monturas al aire).
+// Precio por par según el rango de la fórmula (esfera y cilindro en forma negativa). Se cobra el rango del ojo
+// que quede más alto. Fuera de todos los rangos o con progresivos: asesoría por WhatsApp. Precios aprobados por Solare (5 nov 2026).
 var LENTES_SOL = [
-  { id: 'tinte', nombre: 'Policarbonato tintado negro', corto: 'tintado negro', precio: null,
-    desc: 'Lente de sol oscuro con tu fórmula, en policarbonato liviano y resistente.' },
-  { id: 'transitions', nombre: 'Transitions', corto: 'Transitions', precio: null,
-    desc: 'Claro bajo techo y oscuro al sol: te sirven para todo el día.' },
-  { id: 'blue', nombre: 'Blue protect', corto: 'blue protect', precio: null,
-    desc: 'Lente claro con filtro de luz azul para pantallas. Usas la montura como gafas formuladas.' }
+  { id: 'tinte', nombre: 'Policarbonato tintado negro', corto: 'tintado negro',
+    desc: 'Lente de sol oscuro con tu fórmula, en policarbonato liviano y resistente. Incluye el tinte.',
+    rangos: [
+      { esf: [-6, 4], cil: [-2, 0],     precio: 99900 },
+      { esf: [-2, 2], cil: [-4, -2.25], precio: 129900 }
+    ] },
+  { id: 'transitions', nombre: 'Transitions', corto: 'Transitions',
+    desc: 'Claro bajo techo y oscuro al sol (gris): te sirven para todo el día.',
+    rangos: [
+      { esf: [-2, 2], cil: [-2, 0], precio: 399900 },
+      { esf: [-6, 4], cil: [-2, 0], precio: 539900 }
+    ] },
+  { id: 'blue', nombre: 'Blue protect', corto: 'blue protect',
+    desc: 'Lente claro con filtro de luz azul para pantallas. Usas la montura como gafas formuladas.',
+    rangos: [
+      { esf: [-6, 3], cil: [-2, 0],     precio: 119900 },
+      { esf: [-4, 2], cil: [-4, -2.25], precio: 219900 }
+    ] }
 ];
 var FORMULA_WEBHOOK = '';               // URL de n8n que recibe la foto de la fórmula (vacío = el cliente la adjunta en WhatsApp)
 var REGALO = { nombre: 'Kit de protección', incluye: 'Estuche rígido, funda y paño de microfibra' };
