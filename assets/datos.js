@@ -46,7 +46,9 @@ var LENTES_SOL = [
     ] }
 ];
 var FORMULA_WEBHOOK = '';               // URL de n8n que recibe la foto de la fórmula (vacío = el cliente la adjunta en WhatsApp)
-var REGALO = { nombre: 'Kit de protección', incluye: 'Estuche rígido, funda y paño de microfibra' };
+// fotos: foto real del kit por marca de la gafa. Las marcas sin foto muestran el ícono.
+var REGALO = { nombre: 'Kit de protección', incluye: 'Estuche rígido, funda y paño de microfibra',
+  fotos: { Wanderth: '/img/kit-wanderth.webp' } };
 // Garantía definida por Solare (5 nov 2026). Debe coincidir con la sección 8 de terminos.html.
 var GARANTIA = {
   meses: 6,

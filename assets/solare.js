@@ -82,6 +82,7 @@ var ICONOS = {
   manual: '<path d="M9 39l3-10L33 8l7 7-21 21z"/><path d="M29 12l7 7"/><path class="acf" d="M9 39l3-10 7 7z"/>',
   despues: '<path d="M8 38l2.5-7.5A15 15 0 1 1 17 37z"/><path d="M17 22h14M17 28h9"/>'
 };
+function fotoRegalo(marca) { return (REGALO.fotos || {})[marca] || ''; }
 function iconoAcc(k) { return '<svg viewBox="0 0 48 48" aria-hidden="true">' + ICONOS[k] + '</svg>'; }
 var ICO_CAMION = '<path d="M2.5 6h11.5v10H2.5z"/><path d="M14 9h4.2l3.3 3.4V16H14z"/><circle cx="6.5" cy="17.5" r="1.9"/><circle cx="17.5" cy="17.5" r="1.9"/>';
 var ICO_CHECK = '<circle cx="12" cy="12" r="9"/><path d="M7.5 12.3l3 3 6-6.3"/>';
@@ -276,7 +277,10 @@ function pdpHTML(g) {
       comboHTML(g) +
       '<button class="btn btn-rx" type="button" data-rx="' + g.id + '">Lentes formulados · desde ' + cop(rxDesde(g)) + '</button>' + progHTML(g, true) +
       '<button class="btn btn-ink" type="button" data-comprar="' + g.id + '">Agregar al carrito · ' + cop(g.precio) + '</button>' +
-      '<p class="regalo-nota"><svg viewBox="0 0 48 48" aria-hidden="true">' + ICONOS.regalo + '</svg><span>Con tus gafas te regalamos el <b>' + REGALO.nombre.toLowerCase() + '</b>: ' + REGALO.incluye.toLowerCase() + '.</span></p>' +
+      '<button class="kit-cta" type="button" data-comprar="' + g.id + '">' + (fotoRegalo(g.marca)
+        ? '<img src="' + fotoRegalo(g.marca) + '" alt="" loading="lazy">'
+        : '<svg viewBox="0 0 48 48" aria-hidden="true">' + ICONOS.regalo + '</svg>') +
+        '<span><b>Agrega ahora y recibe tu ' + REGALO.nombre.toLowerCase() + '</b><small>' + REGALO.incluye + '</small></span><span class="flecha" aria-hidden="true">→</span></button>' +
       garantiaHTML() +
       '<p class="nota-envio" data-nota="' + g.id + '"></p>' +
     '</div></div>';
@@ -352,7 +356,7 @@ function accesoriosHTML() {
 function beneficiosHTML() {
   var b = [
     ['<path d="M2.5 6h11.5v10H2.5z"/><path d="M14 9h4.2l3.3 3.4V16H14z"/><circle cx="6.5" cy="17.5" r="1.9"/><circle cx="17.5" cy="17.5" r="1.9"/>', 'Envío gratis desde ' + cop(ENVIO_GRATIS_DESDE), 'A toda Colombia. El carrito te dice cuánto te falta.'],
-    ['<rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M3 7h18v3H3zM12 7v14"/><path d="M12 7c-1.5-3-5.5-3.5-5.5-1 0 1.5 3 1.5 5.5 1zM12 7c1.5-3 5.5-3.5 5.5-1 0 1.5-3 1.5-5.5 1z"/>', 'Kit de protección de regalo', 'Con cada par te regalamos estuche rígido, funda y paño.'],
+    ['<rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M3 7h18v3H3zM12 7v14"/><path d="M12 7c-1.5-3-5.5-3.5-5.5-1 0 1.5 3 1.5 5.5 1zM12 7c1.5-3 5.5-3.5 5.5-1 0 1.5-3 1.5-5.5 1z"/>', 'Tu ' + REGALO.nombre.toLowerCase(), 'Compra ahora y recíbelo con tu pedido: ' + REGALO.incluye.toLowerCase() + '.'],
     [ICO_ESCUDO, 'Garantía de ' + GARANTIA.meses + ' meses', 'Por defectos de fabricación. Reparamos o cambiamos tus gafas.'],
     ['<path d="M4 18.5l1.2-3.6A7.5 7.5 0 1 1 8.6 18z"/><path d="M9 10.5h6M9 13.5h4"/>', 'Asesoría por WhatsApp', 'Te ayudamos a elegir modelo y color antes de pagar.']
   ];
@@ -518,7 +522,7 @@ function pintarAnuncio() {
     'Deportivas en fibra de carbono de <b>25 gramos</b>',
     'Gafas de sol polarizadas: <b>' + cop(Math.min.apply(null, gafasDe('lifestyle').map(function (g) { return g.precio; }))) + '</b>',
     '<button type="button" data-promo><b>' + BIENVENIDA.porcentaje + '%</b> en tu primera compra</button>',
-    REGALO.nombre + ' <b>de regalo</b> con tus gafas',
+    'Compra ahora y recibe tu <b>' + REGALO.nombre.toLowerCase() + '</b>',
     'Lentes formulados en deportivas: <b>' + cop(FORMULA.lab.precio) + '</b>',
     'Garantía de <b>' + GARANTIA.meses + ' meses</b>'
   ];
@@ -708,8 +712,11 @@ function pintarCarrito() {
         '</div></div>' +
       '<div class="item-price">' + cop(linea) + '</div></li>';
   }).join('') + (t.ng ? '<li class="item regalo">' +
-      '<div class="item-img regalo-img">' + iconoAcc('regalo') + '</div>' +
-      '<div class="item-info"><p class="regalo-tag">Por tu compra te regalamos</p><h3>' + REGALO.nombre + '</h3><p class="var">' + REGALO.incluye + '</p></div>' +
+      (function () {
+        var fr = ''; carrito.forEach(function (it) { if (it.tipo === 'gafa' && !fr) fr = fotoRegalo(prod(it).marca); });
+        return '<div class="item-img regalo-img' + (fr ? ' foto' : '') + '">' + (fr ? '<img src="' + fr + '" alt="">' : iconoAcc('regalo')) + '</div>';
+      })() +
+      '<div class="item-info"><p class="regalo-tag">Compra ahora y recibe</p><h3>Tu ' + REGALO.nombre.toLowerCase() + '</h3><p class="var">' + REGALO.incluye + '</p></div>' +
       '<div class="item-price"><span class="gratis">Gratis</span>' + (t.ng > 1 ? '<small>× ' + t.ng + '</small>' : '') + '</div></li>' : '');
 
   pintarAntojos(t);
@@ -899,7 +906,7 @@ function pintarRx() {
       '<div class="rx-res"><span class="ico"><img src="' + foto(g, rx.color, 'mini') + '" alt=""></span><span><h3>' + g.marca + ' ' + g.nombre + '</h3><p>Color ' + c.nombre + '</p></span><span class="mono">' + cop(g.precio) + '</span></div>' +
       '<div class="rx-res">' + ICONO(rx.tipo === 'sol' ? 'lab' : rx.tipo) + '<span><h3>' + f.nombre + '</h3><p>' + det + (f.desde && rx.tipo === 'sol' ? '<br>Es el precio base. Si tu fórmula es alta, te contamos el ajuste antes de tallar.' : '') + '</p></span><span class="mono">' + (f.cotizar ? 'Por cotizar' : (f.desde && rx.tipo === 'sol' ? 'Desde ' : '') + cop(f.base)) + '</span></div>' +
       (f.ajuste ? '<div class="rx-res">' + ICONO('lab') + '<span><h3>Ajuste por fórmula alta</h3><p>' + f.ajusteTxt + '. Este tipo de fórmula lleva un tallado más preciso.</p></span><span class="mono">+' + cop(f.ajuste) + '</span></div>' : '') +
-      '<div class="rx-res">' + ICONO('regalo') + '<span><h3>' + REGALO.nombre + '</h3><p>Te lo regalamos por tu compra: ' + REGALO.incluye.toLowerCase() + '.</p></span><span class="gratis">Gratis</span></div></div>';
+      '<div class="rx-res">' + (fotoRegalo(g.marca) ? '<span class="ico"><img class="kit" src="' + fotoRegalo(g.marca) + '" alt=""></span>' : ICONO('regalo')) + '<span><h3>Tu ' + REGALO.nombre.toLowerCase() + '</h3><p>Agrega ahora y recíbelo con tu pedido: ' + REGALO.incluye.toLowerCase() + '.</p></span><span class="gratis">Gratis</span></div></div>';
   }
   $('#rxBody').innerHTML = h;
   $('#rxBody').scrollTop = 0;
